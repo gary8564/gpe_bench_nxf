@@ -36,7 +36,7 @@ workflow {
     def data_ch
 
     if (params.problem_type == 'high_dim_input') {
-        if (dataset_source == "") {
+        if (params.caseStudy == 'synthetic_100d_function') {
             // 1. Data setup: Generate synthetic data directly
             data_ch = data_setup_synthetic(params.caseStudy)
 
@@ -57,7 +57,7 @@ workflow {
                                     .map { path -> path.toString() }
                                     .collect()
             benchmark_metrics(metrics_list_ch)
-        } else if (dataset_source == "zenodo") {
+        } else if (params.caseStudy == 'tsunami_tokushima') {
             // 1. Data setup: Fetch from Zenodo then process
             def raw_ch = fetch_from_zenodo(params.caseStudy)
             data_ch = data_setup_tsunami(raw_ch)
@@ -79,29 +79,31 @@ workflow {
                                         .collect()
             benchmark_metrics(metrics_list_ch)
         } else {
-            error "NotImplementedError: dataset source ${dataset_source} is not supported for high_dim_input."
+            error "NotImplementedError: caseStudy ${params.caseStudy} is not supported for high_dim_input."
         }
     } else if (params.problem_type == 'high_dim_output') {
-        // High-dimensional output workflow can be synthetic toy example or real datasets
-        if (dataset_source == "") {
-            // Synthetic: generate toy example directly
+        if (params.caseStudy == 'environment_spill_function') {
+            // 1. Data setup: Generate toy example directly
             data_ch = data_setup_toy_example(params.caseStudy)
-        } else {
-            // Real: expects mixed sources: figshare+github per datasets.config
+        } else if (params.caseStudy in ['acheron', 'synthetic_landslide']) {
+            // 1. Data setup: Fetch from figshare and github then process
             def raw_figshare = fetch_from_figshare(params.caseStudy)
             def raw_github   = fetch_from_github(params.caseStudy)
-            // Ensure both downloads complete; join on caseStudy key, then forward one path
-            def both_raw = raw_figshare.raw
+            // Ensure both downloads complete: join on caseStudy key, then forward one path
+            def raw_ch = raw_figshare.raw
                               .join(raw_github.raw, by: 0)
                               .map { cs, pathA, pathB -> tuple(cs, pathA) }
             // Prepare npy arrays from raster stacks and CSV
-            data_ch = data_setup_landslide(both_raw)
+            data_ch = data_setup_landslide(raw_ch)
+        } else {
+            error "NotImplementedError: caseStudy ${params.caseStudy} is not supported for high_dim_output."
         }
 
         // 2. Preprocessing: zero-truncate + standardize + HDF5
         def processed_ch = preprocessing_output(data_ch)
 
         // 3. Train and inference (subset of models for high-dim output)
+        def ppgasp_ch      = evaluate_ppgasp(processed_ch)
         def bigp_ch        = evaluate_bigp(processed_ch)
         def pca_bigp_ch    = evaluate_pca_bigp(processed_ch)
         def mtgp_ch        = evaluate_mtgp(processed_ch)
@@ -111,7 +113,8 @@ workflow {
         def vae_ppgasp_ch  = evaluate_vae_ppgasp(processed_ch)
 
         // 4. Gather metrics and benchmark
-        def metrics_list_ch = bigp_ch.bigp
+        def metrics_list_ch = ppgasp_ch.ppgasp
+                                .mix(bigp_ch.bigp)
                                 .mix(pca_bigp_ch.pca_bigp)
                                 .mix(mtgp_ch.mtgp)
                                 .mix(pca_ppgasp_ch.pca_ppgasp)

@@ -80,7 +80,8 @@ def main():
     predictions_mean, predictions_lower, predictions_upper, predictions_std = uncertainty_propagation(model, Y_train, predictions, scaler_mean, scaler_scale, device=args.device)
     postprocessing_time = time.time() - start_time
     infer_time = gp_infer_time + postprocessing_time
-    ground_truths = np.where(Y_test < args.threshold, 0, Y_test)
+    ground_truths = Y_test * scaler_scale + scaler_mean
+    ground_truths = np.where(ground_truths < args.threshold, 0, ground_truths)
     predictions_mean = np.where(predictions_mean < args.threshold, 0, predictions_mean)
     predictions_lower = np.where(predictions_mean < args.threshold, 0, predictions_lower)
     predictions_upper = np.where(predictions_mean < args.threshold, 0, predictions_upper)
