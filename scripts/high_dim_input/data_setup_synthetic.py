@@ -77,15 +77,15 @@ def generate_synthetic_input(n_samples=1000, seed=None):
     high[19] = 3
     # Draw samples
     X = np.random.uniform(low=low, high=high, size=(n_samples, 100))
-    y = synthetic_function(X)
-    y = y[:, np.newaxis]
-    return X, y
+    Y = synthetic_function(X)
+    Y = Y[:, np.newaxis]
+    return X, Y
 
 def main():
     # 1. Parse arguments
     p = argparse.ArgumentParser()
     p.add_argument("--output-dir", required=True,
-                   help="Store generated X.npy, y.npy")
+                   help="Store generated X.npy, Y.npy")
     p.add_argument("--n-samples", type=int, default=500,
                    help="Number of samples to generate")
     p.add_argument("--seed", type=int, default=None,
@@ -96,14 +96,14 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     
     # 3. Generate synthetic data
-    X, y = generate_synthetic_input(n_samples=args.n_samples, seed=args.seed)
+    X, Y = generate_synthetic_input(n_samples=args.n_samples, seed=args.seed)
     
     # 4. Save data
     np.save(os.path.join(args.output_dir, "X.npy"), X)
-    np.save(os.path.join(args.output_dir, "y.npy"), y)
+    np.save(os.path.join(args.output_dir, "Y.npy"), Y)
     print(f"""[data_setup_synthetic] saved 
           input → {args.output_dir}/X.npy (shape: {X.shape})
-          output → {args.output_dir}/y.npy (shape: {y.shape})""")
+          output → {args.output_dir}/Y.npy (shape: {Y.shape})""")
 
 if __name__ == "__main__":
     main() 

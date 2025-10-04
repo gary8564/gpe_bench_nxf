@@ -13,8 +13,7 @@ process data_setup_tsunami {
   
   # Process downloaded tsunami data
   args="--input-dir ${raw_data} --output-dir processed_data"
-  echo "Running: python ${workflow.launchDir}/scripts/data_setup_tsunami.py \$args"
-  python ${workflow.launchDir}/scripts/data_setup_tsunami.py \$args
+  python ${workflow.launchDir}/scripts/high_dim_input/data_setup_tsunami.py \$args
   
   echo "[data_setup_tsunami] Successfully processed tsunami data for ${caseStudy}"
   """

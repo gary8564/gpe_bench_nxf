@@ -26,8 +26,7 @@ process data_setup_synthetic {
   args="\$args --seed ${dataset_config.parameters.seed}"
   """ : ""}
   
-  echo "Running: python ${workflow.launchDir}/scripts/data_setup_synthetic.py \$args"
-  python ${workflow.launchDir}/scripts/data_setup_synthetic.py \$args
+  python ${workflow.launchDir}/scripts/high_dim_input/data_setup_synthetic.py \$args
   
   echo "[data_setup_synthetic] Successfully generated synthetic data for ${caseStudy}"
   """

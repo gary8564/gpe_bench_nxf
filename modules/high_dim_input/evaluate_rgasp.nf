@@ -12,7 +12,7 @@ process evaluate_rgasp {
   # Execute R script for RGaSP evaluation
   echo "R version:"
   Rscript --version
-  Rscript ${workflow.launchDir}/scripts/evaluate_rgasp.R \\
+  Rscript ${workflow.launchDir}/scripts/high_dim_input/evaluate_rgasp.R \\
     --input-dir ${tensors} \\
     --output-dir results_rgasp
   """

@@ -12,7 +12,7 @@ process evaluate_pca_rgasp {
   # macOS-specific environment variable to avoid OpenMP error
   [[ "\$(uname)" == "Darwin" ]] && export KMP_DUPLICATE_LIB_OK=TRUE
 
-  python ${workflow.launchDir}/scripts/evaluate_pca_rgasp.py \
+  python ${workflow.launchDir}/scripts/high_dim_input/evaluate_pca_rgasp.py \
     --input-dir ${tensors} \
     --output-dir results_pca_rgasp
   """

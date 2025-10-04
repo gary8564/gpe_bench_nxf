@@ -19,8 +19,8 @@ def load_tsunami(data_root_folder):
         "Inundation_distibutions/zmax5depth.txt"), delimiter=",")
     # pick a representative station (median of per-sample argmax)
     loc = int(np.median(np.argmax(Y_all, axis=1)))
-    y = Y_all[:, loc][:, None]
-    return X, y
+    Y = Y_all[:, loc][:, None]
+    return X, Y
 
 def main():
     # 1. Parse arguments
@@ -28,7 +28,7 @@ def main():
     p.add_argument("--input-dir", required=True,
                    help="Directory containing extracted tsunami data")
     p.add_argument("--output-dir", required=True,
-                   help="Store processed X.npy, y.npy")
+                   help="Store processed X.npy, Y.npy")
     args = p.parse_args()
     
     # 2. Check if input directory exists
@@ -39,14 +39,14 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     
     # 4. Load tsunami data
-    X, y = load_tsunami(args.input_dir)
+    X, Y = load_tsunami(args.input_dir)
     
     # 5. Save data
     np.save(os.path.join(args.output_dir, "X.npy"), X)
-    np.save(os.path.join(args.output_dir, "y.npy"), y)
+    np.save(os.path.join(args.output_dir, "Y.npy"), Y)
     print(f"""[data_setup_tsunami] saved 
           input → {args.output_dir}/X.npy (shape: {X.shape})
-          output → {args.output_dir}/y.npy (shape: {y.shape})""")
+          output → {args.output_dir}/Y.npy (shape: {Y.shape})""")
 
 if __name__ == "__main__":
     main() 

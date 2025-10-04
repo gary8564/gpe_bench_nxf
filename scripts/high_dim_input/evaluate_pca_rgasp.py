@@ -29,7 +29,6 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--input-dir",  required=True)
     p.add_argument("--output-dir", required=True)
-    p.add_argument("--device", default="cpu")
     args = p.parse_args()
     
     # 2. Load data from HDF5
