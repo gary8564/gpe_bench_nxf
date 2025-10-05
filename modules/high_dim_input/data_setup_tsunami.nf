@@ -1,4 +1,5 @@
 process data_setup_tsunami {
+  conda "${workflow.launchDir}/envs/data_setup_tsunami.yml"
   tag "${caseStudy}"
   
   input:

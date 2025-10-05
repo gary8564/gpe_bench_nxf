@@ -1,5 +1,7 @@
 process evaluate_exactgp {
+  conda "${workflow.launchDir}/envs/${params.useGPU ? 'evaluate_exactgp_cuda.yml' : 'evaluate_exactgp.yml'}"
   tag "ExactGP"
+  publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
   accelerator 1 
 
   input:

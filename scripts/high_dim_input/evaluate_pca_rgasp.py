@@ -3,12 +3,13 @@ import os
 import json
 import numpy as np
 import h5py
-from high_dim_gp.emulator import PCAScalarGaSP
-from high_dim_gp.dr import InputDimReducer, LinearPCA
-from high_dim_gp.utils import ErrorMetrics
+from high_dim_gp.emulator.pca_robustgasp import PCAScalarGaSP
+from high_dim_gp.dr.pca import InputDimReducer, LinearPCA
 from high_dim_gp.utils.util_funcs import reduced_dim
+from high_dim_gp.utils.error_metrics import ErrorMetrics
+from high_dim_gp.utils.plot import plot_prediction
 
-def descale_data(test_y: np.ndarray,
+def descale_data(gt_scaled: np.ndarray,
                  mean_scaled: np.ndarray,
                  std_scaled: np.ndarray,
                  lower95_scaled: np.ndarray,
@@ -17,7 +18,7 @@ def descale_data(test_y: np.ndarray,
                  scaler_scale: np.ndarray):
     mu = scaler_mean[-1]
     sigma = scaler_scale[-1]
-    groud_truth = test_y * sigma + mu
+    groud_truth = gt_scaled * sigma + mu
     mean = mean_scaled * sigma + mu
     std = std_scaled * sigma
     lower95 = lower95_scaled * sigma + mu
@@ -65,19 +66,28 @@ def main():
         y_test, mean_scaled, std_scaled, lower95_scaled, upper95_scaled, scaler_mean, scaler_scale
     )
     
-    # 6. Evaluate metrics
-    rmse = ErrorMetrics.RMSE(mean, ground_truth)
+    # 6. Compute evaluation metrics
+    rmse = ErrorMetrics.RMSE(predictions=mean, observations=ground_truth)
+    coverage_prob = ErrorMetrics.CoverageProbability(mean, lower95, upper95, ground_truth)
+    quantile_coverage_error = ErrorMetrics.QuantileCoverageError(lower95, upper95, ground_truth)
     
-    # 7. Save metrics
+    # 7. Visualize predictions and ground-truths
     os.makedirs(args.output_dir, exist_ok=True)
+    model_name = "PCA-RGaSP"
+    predictions = np.concatenate([np.array(mean)[:,np.newaxis], np.array(std)[:,np.newaxis]], axis=1)
+    plot_prediction(ground_truth, predictions, model_name, args.output_dir)
+    
+    # 8. Save predictions and metrics
+    hdf5_file = os.path.join(args.output_dir, "pred_and_gt.h5")
+    with h5py.File(hdf5_file, 'w') as f:
+        f.create_dataset('pred_mean', data=mean.astype(np.float64))
+        f.create_dataset('gt', data=ground_truth.astype(np.float64))
+    print(f"[PCA-RGaSP] wrote predictions and ground-truth → {hdf5_file}")
     metrics = dict(
         name="PCA-RGaSP",
-        ground_truth=ground_truth.tolist(),
-        predictions_mean=mean.tolist(),
-        predictions_std=std.tolist(),
-        predictions_lower95=lower95.tolist(),
-        predictions_upper95=upper95.tolist(),
         rmse=float(rmse),
+        coverage_prob=float(coverage_prob),
+        quantile_coverage_error=float(quantile_coverage_error),
         train_time=float(training_time),
         infer_time=float(infer_time)
     )

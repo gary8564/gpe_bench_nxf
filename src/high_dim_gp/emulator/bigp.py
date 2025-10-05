@@ -112,16 +112,19 @@ class BatchIndependentMultioutputGPModel(ExactGP):
         inner = self._get_inner_kernel(self.covar_module)
         n_samples = train_x.shape[0]
         input_dim = float(self.input_dim)
+        # Ensure we initialize using the same device as kernel parameters
+        param_device = inner.raw_lengthscale.device
+        feature_ranges = feature_ranges.to(param_device)
         # Initialize lengthscales using empirical scaling
         scaling_factors = feature_ranges / (n_samples ** (1.0 / input_dim))
         init_lengthscales = 3.0 * scaling_factors
         inner.initialize(lengthscale=init_lengthscales.unsqueeze(0))
-        # Set lower bounds for lengthscales in raw space
-        lower_bounds = -torch.log(torch.tensor(0.1)) / (feature_ranges * input_dim)
+        # Set lower bounds for lengthscales in raw space (on the kernel param device)
+        lower_bounds = -torch.log(torch.tensor(0.1, device=param_device)) / (feature_ranges * input_dim)
         raw_lb = torch.log(torch.exp(lower_bounds) - 1.0)
         inner.register_constraint("raw_lengthscale", GreaterThan(raw_lb))
-        # Initialize outputscale
-        init_outputscale = train_y.var(dim=0).mean().sqrt()
+        # Initialize outputscale on the same device as kernel parameters
+        init_outputscale = train_y.var(dim=0).mean().sqrt().to(param_device)
         self.covar_module.outputscale = init_outputscale
 
     def tie_parameters_across_tasks(self):
@@ -191,6 +194,11 @@ class BiGP:
         self.model.train()
         self.likelihood.train()
         mll = ExactMarginalLogLikelihood(self.likelihood, self.model)
+        # After moving to device, ensure any constraint lower bounds are also on the same device
+        inner_kernel = self.model._get_inner_kernel(self.model.covar_module)
+        constraint = inner_kernel.raw_lengthscale_constraint
+        if hasattr(constraint, 'lower_bound') and torch.is_tensor(constraint.lower_bound):
+            constraint.lower_bound = constraint.lower_bound.to(self.device)
         
         # Optimizer
         fine_tune_optimizer = None

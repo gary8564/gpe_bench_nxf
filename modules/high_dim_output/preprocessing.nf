@@ -1,4 +1,5 @@
 process preprocessing_high_dim_output {
+  conda "${workflow.launchDir}/envs/preprocessing.yml"
   tag "preprocessing_high_dim_output"
   input:
     path processed_data

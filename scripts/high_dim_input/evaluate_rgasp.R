@@ -8,7 +8,9 @@
 # 2. Load data from HDF5
 # 3. Train RGaSP model
 # 4. Make predictions
-# 5. Calculate metrics and save results
+# 5. Descale predictions
+# 6. Compute metrics and visualize predictions and ground-truths
+# 7. Save predictions (HDF5) and evaluation metrics (JSON)
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -236,21 +238,15 @@ extract_prediction_components <- function(predictions) {
 }
 
 # =============================================================================
-# 5. METRICS CALCULATION
+# 5. SAVE PREDICTIONS AND TIMINGS
 # =============================================================================
 
-descale_predictions <- function(test_y, mean_scaled, std_scaled, lower95_scaled, upper95_scaled, 
-                               scaler_mean, scaler_scale) {
-  # Descale predictions to original scale
-  
-  # Get scaling parameters for y (last column)
+descale_to_original <- function(mean_scaled, std_scaled, lower95_scaled, upper95_scaled, scaler_mean, scaler_scale) {
+  # Descale predictions to original scale using last entry of scaler params (y)
   mu <- scaler_mean[length(scaler_mean)]
   sigma <- scaler_scale[length(scaler_scale)]
-  
   cat(sprintf("[RGaSP] Descaling with mu=%.6f, sigma=%.6f\n", mu, sigma))
-  
   return(list(
-    ground_truth = test_y * sigma + mu,
     mean = mean_scaled * sigma + mu,
     std = std_scaled * sigma,
     lower95 = lower95_scaled * sigma + mu,
@@ -258,22 +254,107 @@ descale_predictions <- function(test_y, mean_scaled, std_scaled, lower95_scaled,
   ))
 }
 
-calculate_rmse <- function(predictions, ground_truth) {
-  # Calculate RMSE between predictions and ground truth
-  sqrt(mean((predictions - ground_truth)^2))
-}
-
-save_results <- function(metrics, output_dir) {
-  # Save metrics to JSON file
-  
+save_predictions_h5 <- function(pred_mean, pred_std, pred_lower95, pred_upper95, output_dir) {
   if (!dir.exists(output_dir)) {
     dir.create(output_dir, recursive = TRUE)
   }
-  
-  output_file <- file.path(output_dir, "metrics.json")
-  write_json(metrics, output_file, auto_unbox = TRUE, digits = 6)
-  
-  cat(sprintf("[RGaSP] Metrics saved to %s\n", output_file))
+  pred_path <- file.path(output_dir, "predictions.h5")
+  h5 <- H5File$new(pred_path, mode = "w")
+  on.exit(h5$close_all(), add = TRUE)
+  h5$create_dataset("pred_mean", pred_mean)
+  h5$create_dataset("pred_std", pred_std)
+  h5$create_dataset("pred_lower95", pred_lower95)
+  h5$create_dataset("pred_upper95", pred_upper95)
+  cat(sprintf("[RGaSP] Predictions saved to %s\n", pred_path))
+}
+
+save_timings_json <- function(train_time, infer_time, output_dir, model_name = "RGaSP") {
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
+  timings <- list(
+    model_name = model_name,
+    train_time = as.numeric(train_time),
+    infer_time = as.numeric(infer_time)
+  )
+  out_path <- file.path(output_dir, "timings.json")
+  write_json(timings, out_path, auto_unbox = TRUE, digits = 6)
+  cat(sprintf("[RGaSP] Timings saved to %s\n", out_path))
+}
+
+# =============================================================================
+# 6. METRICS, PLOTTING, AND ARTIFACT SAVING
+# =============================================================================
+
+compute_rmse <- function(predictions, observations) {
+  return(sqrt(mean((predictions - observations)^2, na.rm = TRUE)))
+}
+
+compute_coverage_probability <- function(lower95, upper95, observations) {
+  inside <- (observations >= lower95) & (observations <= upper95)
+  return(mean(inside))
+}
+
+compute_quantile_coverage_error <- function(lower95, upper95, observations, target = 0.95) {
+  cp <- compute_coverage_probability(lower95, upper95, observations)
+  return(abs(cp - target))
+}
+
+plot_prediction <- function(ground_truth, predictions, model_name, output_dir) {
+  # predictions: Nx2 matrix with columns [mean, std]
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
+  y_true <- as.numeric(ground_truth)
+  y_pred <- as.numeric(predictions[, 1])
+  y_std <- as.numeric(predictions[, 2])
+  rng <- range(y_true, na.rm = TRUE)
+  out_png <- file.path(output_dir, paste0("prediction_vs_ground_truth_", model_name, ".png"))
+  png(out_png, width = 1200, height = 700)
+  on.exit(dev.off(), add = TRUE)
+  plot(y_true, y_pred,
+       xlab = "Actual y", ylab = "Predicted y",
+       xlim = rng, ylim = rng,
+       pch = 1, col = "cornflowerblue", cex = 0.9,
+       main = paste0("Prediction v.s. Ground-truth for ", model_name, " Model"))
+  # vertical error bars for ±1 std (to mirror Python implementation)
+  segments(y_true, y_pred - y_std, y_true, y_pred + y_std,
+           col = "cornflowerblue", lwd = 1)
+  # reference y = x line
+  abline(0, 1, col = "black", lwd = 2)
+  legend("topleft",
+         legend = c("emulator prediction ± std"),
+         pch = 1, col = "cornflowerblue", bty = "n")
+  cat(sprintf("[RGaSP] Plot saved to %s\n", out_png))
+}
+
+save_pred_and_gt_to_h5 <- function(pred_mean, ground_truth, output_dir) {
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
+  out_path <- file.path(output_dir, "pred_and_gt.h5")
+  h5 <- H5File$new(out_path, mode = "w")
+  on.exit(h5$close_all(), add = TRUE)
+  h5$create_dataset("pred_mean", as.numeric(pred_mean))
+  h5$create_dataset("gt", as.numeric(ground_truth))
+  cat(sprintf("[RGaSP] wrote predictions and ground-truth \u2192 %s\n", out_path))
+}
+
+save_metrics_json <- function(model_name, rmse, coverage_prob, quantile_coverage_error, train_time, infer_time, output_dir) {
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
+  metrics <- list(
+    name = model_name,
+    rmse = as.numeric(rmse),
+    coverage_prob = as.numeric(coverage_prob),
+    quantile_coverage_error = as.numeric(quantile_coverage_error),
+    train_time = as.numeric(train_time),
+    infer_time = as.numeric(infer_time)
+  )
+  out_path <- file.path(output_dir, "metrics.json")
+  write_json(metrics, out_path, auto_unbox = TRUE, digits = 6)
+  cat(sprintf("[RGaSP] metrics \u2192 %s\n", out_path))
 }
 
 # =============================================================================
@@ -283,7 +364,7 @@ save_results <- function(metrics, output_dir) {
 main <- function() {
   # Main execution function following standard GP workflow
   
-  cat("[RGaSP] Starting evaluation...\n")
+  cat("[RGaSP] Starting training and prediction...\n")
   
   # 1. Parse arguments
   opt <- parse_arguments()
@@ -304,39 +385,45 @@ main <- function() {
   # Extract prediction components
   pred_components <- extract_prediction_components(pred_result$predictions)
   
-  # 5. Calculate metrics
-  cat("[RGaSP] Calculating metrics...\n")
-  
-  # Descale predictions
-  descaled <- descale_predictions(
-    data$y_test, 
-    pred_components$mean_scaled, 
-    pred_components$std_scaled, 
-    pred_components$lower95_scaled, 
+  # 5. Descale predictions
+  descaled <- descale_to_original(
+    pred_components$mean_scaled,
+    pred_components$std_scaled,
+    pred_components$lower95_scaled,
     pred_components$upper95_scaled,
-    data$scaler_mean, 
+    data$scaler_mean,
     data$scaler_scale
   )
-  
-  # Calculate RMSE
-  rmse <- calculate_rmse(descaled$mean, descaled$ground_truth)
-  cat(sprintf("[RGaSP] RMSE: %.6f\n", rmse))
-  
-  # Prepare and save results
-  metrics <- list(
-    name = "RGaSP",
-    ground_truth = as.numeric(descaled$ground_truth),
-    predictions_mean = as.numeric(descaled$mean),
-    predictions_std = as.numeric(descaled$std),
-    predictions_lower95 = as.numeric(descaled$lower95),
-    predictions_upper95 = as.numeric(descaled$upper95),
-    rmse = rmse,
-    train_time = train_result$training_time,
-    infer_time = pred_result$infer_time
+  # Compute ground truth (descaled y_test)
+  mu <- data$scaler_mean[length(data$scaler_mean)]
+  sigma <- data$scaler_scale[length(data$scaler_scale)]
+  ground_truth <- as.numeric(data$y_test) * sigma + mu
+
+  # 6. Compute evaluation metrics
+  rmse <- compute_rmse(descaled$mean, ground_truth)
+  coverage_prob <- compute_coverage_probability(descaled$lower95, descaled$upper95, ground_truth)
+  quantile_coverage_error <- compute_quantile_coverage_error(descaled$lower95, descaled$upper95, ground_truth)
+
+  # 7. Visualize predictions and ground-truths
+  predictions <- cbind(as.numeric(descaled$mean), as.numeric(descaled$std))
+  plot_prediction(ground_truth, predictions, "RGaSP", opt$`output-dir`)
+
+  # 8. Save pred_and_gt and metrics
+  save_pred_and_gt_to_h5(
+    pred_mean = descaled$mean,
+    ground_truth = ground_truth,
+    output_dir = opt$`output-dir`
   )
-  
-  save_results(metrics, opt$`output-dir`)
-  cat("[RGaSP] Evaluation completed successfully!\n")
+  save_metrics_json(
+    model_name = "RGaSP",
+    rmse = rmse,
+    coverage_prob = coverage_prob,
+    quantile_coverage_error = quantile_coverage_error,
+    train_time = train_result$training_time,
+    infer_time = pred_result$infer_time,
+    output_dir = opt$`output-dir`
+  )
+  cat("[RGaSP] Train & predict completed successfully!\n")
 }
 
 # =============================================================================

@@ -1,5 +1,7 @@
 process evaluate_pca_ppgasp {
+  conda "${workflow.launchDir}/envs/evaluate_pca_ppgasp.yml"
   tag "PCA-PPGaSP"
+  publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
 
   input:
     path tensors
@@ -13,7 +15,8 @@ process evaluate_pca_ppgasp {
     --input-dir ${tensors} \
     --output-dir results_pca_ppgasp \
     --n-components ${params.n_components} \
-    --threshold ${params.threshold}
+    --threshold ${params.threshold} \
+    --qoi ${params.qoi}
   """
 }
 

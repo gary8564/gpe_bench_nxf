@@ -2,6 +2,7 @@ import numpy as np
 import rasterio
 import argparse
 import os
+import shutil
 
 def load_dataset(input_filepath, output_filepath):
     input_data = np.genfromtxt(input_filepath, delimiter=',', skip_header=1)
@@ -17,8 +18,10 @@ def load_dataset(input_filepath, output_filepath):
 def main():
     # 1. Parse arguments
     p = argparse.ArgumentParser()
-    p.add_argument("--input-dir", required=True,
-                   help="Directory containing extracted synthetic data")
+    p.add_argument("--figshare-dir", required=True,
+                   help="Directory containing Figshare data (output data)")
+    p.add_argument("--github-dir", required=True,
+                   help="Directory containing GitHub data (input data)")
     p.add_argument("--output-dir", required=True,
                    help="Store processed train_X.npy, train_Y.npy, test_X.npy, test_Y.npy")
     p.add_argument("--qoi", required=True,
@@ -26,24 +29,33 @@ def main():
                    choices=["hmax", "vmax"])
     args = p.parse_args()
     
-    # 2. Check if input directory exists
-    if not os.path.exists(args.input_dir):
-        raise ValueError(f"Input directory does not exist: {args.input_dir}")
-    train_data_root_folder = os.path.join(args.input_dir, "train")
-    test_data_root_folder = os.path.join(args.input_dir, "test")
-    train_input_filepath = os.path.join(train_data_root_folder, "input", "synth_emulator.csv")
-    train_output_filepath = os.path.join(train_data_root_folder, "output", args.qoi + "_stack.tif") 
-    test_input_filepath = os.path.join(test_data_root_folder, "input", "synth_validation_emulator.csv")
-    test_output_filepath = os.path.join(test_data_root_folder, "output", args.qoi + "_stack.tif") 
+    # 2. Check if input directories exist
+    if not os.path.exists(args.figshare_dir):
+        raise ValueError(f"Figshare directory does not exist: {args.figshare_dir}")
+    if not os.path.exists(args.github_dir):
+        raise ValueError(f"GitHub directory does not exist: {args.github_dir}")
     
-    # 3. Create output directory
+    # 3. Construct file paths
+    train_input_filepath = os.path.join(args.github_dir, "train", "input", "synth_emulator.csv")
+    train_output_filepath = os.path.join(args.figshare_dir, "train", "output", args.qoi + "_stack.tif") 
+    test_input_filepath = os.path.join(args.github_dir, "test", "input", "synth_validation_emulator.csv")
+    test_output_filepath = os.path.join(args.figshare_dir, "test", "output", args.qoi + "_stack.tif") 
+    hill_path = os.path.join(args.github_dir, "background", "hillshade_acheron.tif") 
+    if not os.path.exists(hill_path):
+        hill_path = None
+        
+    # 4. Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
     
-    # 4. Load synthetic data
+    # 5. Copy background image
+    if hill_path is not None:
+        shutil.copy(hill_path, os.path.join(args.output_dir, "background.tif"))
+    
+    # 6. Load synthetic data
     train_X, train_Y = load_dataset(train_input_filepath, train_output_filepath)
     test_X, test_Y = load_dataset(test_input_filepath, test_output_filepath)
     
-    # 5. Save data
+    # 7. Save data
     np.save(os.path.join(args.output_dir, "train_X.npy"), train_X)
     np.save(os.path.join(args.output_dir, "train_Y.npy"), train_Y)
     np.save(os.path.join(args.output_dir, "test_X.npy"), test_X)

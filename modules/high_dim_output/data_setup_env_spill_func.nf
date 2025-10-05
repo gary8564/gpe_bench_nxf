@@ -1,4 +1,5 @@
-process data_setup_toy_example {
+process data_setup_env_spill_func {
+  conda "${workflow.launchDir}/envs/data_setup_env_spill_func.yml"
   tag "${caseStudy}"
 
   input:
@@ -10,7 +11,7 @@ process data_setup_toy_example {
   script:
   def dataset_config = params.datasets[caseStudy]
   """
-  echo "[data_setup_toy_example] Generating high-dim-output toy example for ${caseStudy}"
+  echo "[data_setup_env_spill_func] Generating high-dim-output toy example for ${caseStudy}"
 
   # Build arguments - only add parameters that are configured
   args="--output-dir processed_data"
@@ -25,9 +26,9 @@ process data_setup_toy_example {
   args=\"\$args --seed ${dataset_config.parameters.seed}\"
   """ : ""}
 
-  python ${workflow.launchDir}/scripts/high_dim_output/data_setup_toy_example.py \$args
+  python ${workflow.launchDir}/scripts/high_dim_output/data_setup_env_spill_func.py \$args
 
-  echo "[data_setup_toy_example] Successfully generated synthetic toy example for ${caseStudy}"
+  echo "[data_setup_env_spill_func] Successfully generated synthetic toy example for ${caseStudy}"
   """
 }
 

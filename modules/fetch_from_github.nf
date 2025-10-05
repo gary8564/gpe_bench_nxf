@@ -1,4 +1,5 @@
 process fetch_from_github {
+  conda "${workflow.launchDir}/envs/fetch_from_github.yml"
   tag "${caseStudy}"
 
   input:
@@ -19,8 +20,8 @@ process fetch_from_github {
 
   ${dataset_config?.github?.files ? dataset_config.github.files.collect { f ->
     // Build raw GitHub URL from a blob URL
-    def m = (f.url =~ /https:\\/\\/github\\.com\\/([^\\/]+)\\/([^\\/]+)\\/blob\\/([^\\/]+)\\/(.*)/)
-    def rawUrl = m ? "https://raw.githubusercontent.com/${m[0][1]}/${m[0][2]}/${m[0][3]}/${m[0][4]}" : f.url
+    def url = f.url
+    def rawUrl = url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/')
     def dest = f.dest
     def filename = rawUrl.tokenize('/')[-1]
     return """

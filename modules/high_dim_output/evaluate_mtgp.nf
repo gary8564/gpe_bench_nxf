@@ -1,5 +1,7 @@
 process evaluate_mtgp {
+  conda "${workflow.launchDir}/envs/${params.useGPU ? 'evaluate_mtgp_cuda.yml' : 'evaluate_mtgp.yml'}"
   tag "MTGP"
+  publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
   accelerator 1 
 
   input:
@@ -17,6 +19,7 @@ process evaluate_mtgp {
     --input-dir ${tensors} \
     --output-dir results_mtgp \
     --threshold ${params.threshold} \
+    --qoi ${params.qoi} \
     ${params.useGPU ? '--device cuda' : '--device cpu'}
   """
 }

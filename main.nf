@@ -1,32 +1,33 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-include { fetch_from_zenodo } from '../modules/fetch_from_zenodo.nf'
-include { fetch_from_figshare } from '../modules/fetch_from_figshare.nf'
-include { fetch_from_github } from '../modules/fetch_from_github.nf'
+include { fetch_from_zenodo } from './modules/fetch_from_zenodo.nf'
+include { fetch_from_figshare } from './modules/fetch_from_figshare.nf'
+include { fetch_from_github } from './modules/fetch_from_github.nf'
 
 // High-dim INPUT modules
-include { data_setup_synthetic } from '../modules/high_dim_input/data_setup_synthetic.nf'
-include { data_setup_tsunami } from '../modules/high_dim_input/data_setup_tsunami.nf'
-include { preprocessing_high_dim_input as preprocessing_input } from '../modules/high_dim_input/preprocessing.nf'
-include { evaluate_exactgp } from '../modules/high_dim_input/evaluate_exactgp.nf'
-include { evaluate_dkl     } from '../modules/high_dim_input/evaluate_dkl.nf'
-include { evaluate_rgasp   } from '../modules/high_dim_input/evaluate_rgasp.nf'
-include { evaluate_pca_rgasp } from '../modules/high_dim_input/evaluate_pca_rgasp.nf'
+include { data_setup_100d_func } from './modules/high_dim_input/data_setup_100d_func.nf'
+include { data_setup_tsunami } from './modules/high_dim_input/data_setup_tsunami.nf'
+include { preprocessing_high_dim_input as preprocessing_input } from './modules/high_dim_input/preprocessing.nf'
+include { evaluate_exactgp } from './modules/high_dim_input/evaluate_exactgp.nf'
+include { evaluate_dkl     } from './modules/high_dim_input/evaluate_dkl.nf'
+include { evaluate_rgasp   } from './modules/high_dim_input/evaluate_rgasp.nf'
+include { evaluate_pca_rgasp } from './modules/high_dim_input/evaluate_pca_rgasp.nf'
 
 // High-dim OUTPUT modules
-include { data_setup_landslide } from '../modules/high_dim_output/data_setup_landslide.nf'
-include { data_setup_toy_example } from '../modules/high_dim_output/data_setup_toy_example.nf'
-include { preprocessing_high_dim_output as preprocessing_output } from '../modules/high_dim_output/preprocessing.nf'
-include { evaluate_bigp } from '../modules/high_dim_output/evaluate_bigp.nf'
-include { evaluate_mtgp } from '../modules/high_dim_output/evaluate_mtgp.nf'
-include { evaluate_pca_bigp } from '../modules/high_dim_output/evaluate_pca_bigp.nf'
-include { evaluate_pca_ppgasp } from '../modules/high_dim_output/evaluate_pca_ppgasp.nf'
-include { evaluate_kpca_ppgasp } from '../modules/high_dim_output/evaluate_kpca_ppgasp.nf'
-include { evaluate_ae_ppgasp } from '../modules/high_dim_output/evaluate_ae_ppgasp.nf'
-include { evaluate_vae_ppgasp } from '../modules/high_dim_output/evaluate_vae_ppgasp.nf'
+include { data_setup_landslide } from './modules/high_dim_output/data_setup_landslide.nf'
+include { data_setup_env_spill_func } from './modules/high_dim_output/data_setup_env_spill_func.nf'
+include { preprocessing_high_dim_output as preprocessing_output } from './modules/high_dim_output/preprocessing.nf'
+include { evaluate_ppgasp } from './modules/high_dim_output/evaluate_ppgasp.nf'
+include { evaluate_bigp } from './modules/high_dim_output/evaluate_bigp.nf'
+include { evaluate_mtgp } from './modules/high_dim_output/evaluate_mtgp.nf'
+include { evaluate_pca_bigp } from './modules/high_dim_output/evaluate_pca_bigp.nf'
+include { evaluate_pca_ppgasp } from './modules/high_dim_output/evaluate_pca_ppgasp.nf'
+include { evaluate_kpca_ppgasp } from './modules/high_dim_output/evaluate_kpca_ppgasp.nf'
+include { evaluate_ae_ppgasp } from './modules/high_dim_output/evaluate_ae_ppgasp.nf'
+include { evaluate_vae_ppgasp } from './modules/high_dim_output/evaluate_vae_ppgasp.nf'
 
-include { benchmark_metrics } from '../modules/benchmark_metrics.nf'
+include { benchmark_metrics } from './modules/benchmark_metrics.nf'
 
 workflow {
     println "▶ Starting pipeline with caseStudy=${params.caseStudy}, problem_type=${params.problem_type}"
@@ -38,7 +39,7 @@ workflow {
     if (params.problem_type == 'high_dim_input') {
         if (params.caseStudy == 'synthetic_100d_function') {
             // 1. Data setup: Generate synthetic data directly
-            data_ch = data_setup_synthetic(params.caseStudy)
+            data_ch = data_setup_100d_func(params.caseStudy)
 
             // 2. Preprocessing: Standardize, split, save to HDF5
             def processed_ch = preprocessing_input(data_ch)
@@ -84,15 +85,15 @@ workflow {
     } else if (params.problem_type == 'high_dim_output') {
         if (params.caseStudy == 'environment_spill_function') {
             // 1. Data setup: Generate toy example directly
-            data_ch = data_setup_toy_example(params.caseStudy)
+            data_ch = data_setup_env_spill_func(params.caseStudy)
         } else if (params.caseStudy in ['acheron', 'synthetic_landslide']) {
             // 1. Data setup: Fetch from figshare and github then process
             def raw_figshare = fetch_from_figshare(params.caseStudy)
             def raw_github   = fetch_from_github(params.caseStudy)
-            // Ensure both downloads complete: join on caseStudy key, then forward one path
+            // Ensure both downloads complete: join on caseStudy key, then merge both paths
             def raw_ch = raw_figshare.raw
                               .join(raw_github.raw, by: 0)
-                              .map { cs, pathA, pathB -> tuple(cs, pathA) }
+                              .map { cs, pathA, pathB -> tuple(cs, pathA, pathB) }
             // Prepare npy arrays from raster stacks and CSV
             data_ch = data_setup_landslide(raw_ch)
         } else {

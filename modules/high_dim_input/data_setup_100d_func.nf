@@ -1,4 +1,5 @@
-process data_setup_synthetic {
+process data_setup_100d_func {
+  conda "${workflow.launchDir}/envs/data_setup_synthetic.yml"
   tag "${caseStudy}"
   
   input:
@@ -11,7 +12,7 @@ process data_setup_synthetic {
   def dataset_config = params.datasets[caseStudy]
   
   """
-  echo "[data_setup_synthetic] Generating synthetic data for ${caseStudy}"
+  echo "[data_setup_100d_func] Generating synthetic data for ${caseStudy}"
   
   # Build arguments - only add parameters that are configured
   args="--output-dir processed_data"
@@ -26,8 +27,8 @@ process data_setup_synthetic {
   args="\$args --seed ${dataset_config.parameters.seed}"
   """ : ""}
   
-  python ${workflow.launchDir}/scripts/high_dim_input/data_setup_synthetic.py \$args
+  python ${workflow.launchDir}/scripts/high_dim_input/data_setup_100d_func.py \$args
   
-  echo "[data_setup_synthetic] Successfully generated synthetic data for ${caseStudy}"
+  echo "[data_setup_100d_func] Successfully generated synthetic data for ${caseStudy}"
   """
 }

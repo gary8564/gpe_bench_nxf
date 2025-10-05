@@ -1,4 +1,5 @@
 process fetch_from_figshare {
+  conda "${workflow.launchDir}/envs/fetch_from_figshare.yml"
   tag "${caseStudy}"
 
   input:

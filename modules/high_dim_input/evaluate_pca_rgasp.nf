@@ -1,5 +1,7 @@
 process evaluate_pca_rgasp {
+  conda "${workflow.launchDir}/envs/evaluate_pca_rgasp.yml"
   tag "PCA-RGaSP"
+  publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
 
   input:
     path tensors

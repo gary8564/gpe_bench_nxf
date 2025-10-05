@@ -2,6 +2,7 @@ import argparse
 import os
 import numpy as np
 import h5py
+import shutil
 from sklearn.preprocessing import StandardScaler
 
 def zero_truncated_data(raw_data, threshold, valid_cols=None):
@@ -64,6 +65,13 @@ def main():
     X_test_scaled = input_scaler.transform(X_test)
     Y_test_scaled = output_scaler.transform(Y_test)
     
+    # Optional: Copy background image to pass on for later visualization
+    bg_src = os.path.join(args.input_dir, "background.tif")
+    bg_dest = None
+    if os.path.exists(bg_src):
+        bg_dest = os.path.join(args.output_dir, "background.tif")
+        shutil.copy2(bg_src, bg_dest)
+        
     # 3. Save to HDF5 (language-agnostic format)
     hdf5_file = os.path.join(args.output_dir, "data.h5")
     with h5py.File(hdf5_file, 'w') as f:
@@ -76,6 +84,13 @@ def main():
         # Save standardization parameters
         f.create_dataset('output_scaler_mean', data=output_scaler.mean_.astype(np.float64))
         f.create_dataset('output_scaler_scale', data=output_scaler.scale_.astype(np.float64))
+        
+        # Save metadata
+        f.create_dataset("valid_indices", data=valid_cols.astype(np.int64))
+        f.attrs["rows"] = int(rows)
+        f.attrs["cols"] = int(cols)
+        f.attrs["threshold"] = float(args.threshold)
+        f.attrs["background_img_path"] = bg_dest if bg_dest else ""
 
     print(f"[preprocess] wrote HDF5 data → {hdf5_file}")
 

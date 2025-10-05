@@ -1,5 +1,7 @@
 process evaluate_kpca_ppgasp {
+  conda "${workflow.launchDir}/envs/evaluate_kpca_ppgasp.yml"
   tag "kPCA-PPGaSP"
+  publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
 
   input:
     path tensors
@@ -13,6 +15,7 @@ process evaluate_kpca_ppgasp {
     --input-dir ${tensors} \
     --output-dir results_kpca_ppgasp \
     --n-components ${params.n_components} \
+    --qoi ${params.qoi} \
     --threshold ${params.threshold}
   """
 }

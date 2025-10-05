@@ -1,5 +1,7 @@
 process evaluate_ae_ppgasp {
+  conda "${workflow.launchDir}/envs/${params.useGPU ? 'evaluate_ae_ppgasp_cuda.yml' : 'evaluate_ae_ppgasp.yml'}"
   tag "AE-PPGaSP"
+  publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
   accelerator 1 
 
   input:
@@ -18,6 +20,7 @@ process evaluate_ae_ppgasp {
     --output-dir results_ae_ppgasp \
     --threshold ${params.threshold} \
     --latent-dim ${params.latent_dim} \
+    --qoi ${params.qoi} \
     ${params.useGPU ? '--device cuda' : '--device cpu'}
   """
 }

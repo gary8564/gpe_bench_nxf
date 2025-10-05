@@ -1,5 +1,7 @@
 process evaluate_pca_bigp {
-  tag "PCA-BiGP"
+  conda "${workflow.launchDir}/envs/${params.useGPU ? 'evaluate_pca_bigp_cuda.yml' : 'evaluate_pca_bigp.yml'}"
+  tag "PCA-BiGP" 
+  publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
   accelerator 1 
 
   input:
@@ -17,6 +19,7 @@ process evaluate_pca_bigp {
     --input-dir ${tensors} \
     --output-dir results_pca_bigp \
     --threshold ${params.threshold} \
+    --qoi ${params.qoi} \
     ${params.useGPU ? '--device cuda' : '--device cpu'}
   """
 }

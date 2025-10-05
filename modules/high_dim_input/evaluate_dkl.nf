@@ -1,5 +1,7 @@
 process evaluate_dkl {
+  conda "${workflow.launchDir}/envs/${params.useGPU ? 'evaluate_dkl_cuda.yml' : 'evaluate_dkl.yml'}"
   tag "DKL"
+  publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
   accelerator 1 
 
   input:

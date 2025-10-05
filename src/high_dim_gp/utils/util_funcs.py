@@ -54,7 +54,7 @@ def uncertainty_propagation(model: nn.Module,
     num_test, latent_dim = mean_reduced.shape
     # Decode predictions
     if hasattr(model, "decoder"):
-        predictions_mean_normalized = model.decoder(torch.FloatTensor(predictions[:, :, 0]).to(device)).detach().numpy()
+        predictions_mean_normalized = model.decoder(torch.FloatTensor(predictions[:, :, 0]).to(device)).detach().cpu().numpy()
     elif hasattr(model, "decode"):
         predictions_mean_normalized = model.decode(torch.FloatTensor(predictions[:, :, 0]).to(device)).cpu().detach().numpy()
     else:
@@ -67,7 +67,7 @@ def uncertainty_propagation(model: nn.Module,
     original_samples = np.zeros((num_test, original_dim, num_mc_samples))
     latent_flat = latent_samples.transpose(0, 2, 1).reshape(num_test * num_mc_samples, latent_dim)
     if hasattr(model, "decoder"):
-        original_flat = model.decoder(torch.FloatTensor(latent_flat).to(device)).detach().numpy()
+        original_flat = model.decoder(torch.FloatTensor(latent_flat).to(device)).detach().cpu().numpy()
     elif hasattr(model, "decode"):
         original_flat = model.decode(torch.FloatTensor(latent_flat).to(device)).cpu().detach().numpy()
     else:

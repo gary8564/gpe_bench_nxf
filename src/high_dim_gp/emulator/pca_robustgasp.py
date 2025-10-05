@@ -3,7 +3,7 @@ import time
 from typing import Optional
 from sklearn.preprocessing import StandardScaler
 from psimpy.emulator import ScalarGaSP, PPGaSP
-from high_dim_gp.dr import InputDimReducer, OutputDimReducer
+from high_dim_gp.dr.pca import InputDimReducer, OutputDimReducer
 
 class PCAScalarGaSP:
     def __init__(self,

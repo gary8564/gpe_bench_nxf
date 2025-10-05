@@ -1,6 +1,9 @@
 import numpy as np
 import rasterio
+import os
 import logging
+import pandas as pd
+import seaborn as sns
 from matplotlib import pyplot as plt
 from rasterio.plot import plotting_extent
 from matplotlib.colors import ListedColormap, BoundaryNorm
@@ -37,11 +40,13 @@ def _reconstruct_output_image(output: np.ndarray, rows: int, cols: int, valid_co
     # print("Reconstructed output image dimension: ", output_hmax.shape)
     return output_hmax, output_mean, output_std
 
-def _viz_output_image(mean_gt: np.ndarray, 
+def _plot_output_image(mean_gt: np.ndarray, 
                       std_gt: np.ndarray, 
                       mean_pred: np.ndarray, 
                       std_pred: np.ndarray, 
                       qoi: str, 
+                      model_name: str,
+                      output_dir: str,
                       hill_path: Optional[str] = None,
                       x_ticks: Optional[list | np.ndarray] = None,
                       y_ticks: Optional[list | np.ndarray] = None,
@@ -202,9 +207,12 @@ def _viz_output_image(mean_gt: np.ndarray,
                 ax.set_xticklabels([])
             ax.tick_params(axis='both', which='both', labelsize=tick_size)
     fig.tight_layout()
-    plt.show()
+    plt.savefig(os.path.join(output_dir, f"output_image_{model_name}.png"))
     
-def _viz_diff_grid_points_binary(ground_truth: np.ndarray, prediction: np.ndarray):
+def _plot_diff_grid_points_binary(ground_truth: np.ndarray, 
+                                 prediction: np.ndarray, 
+                                 model_name: str, 
+                                 output_dir: str):
     diff = ground_truth - prediction
     flag = np.where(diff > 0, 1, np.where(diff < 0, -1, 0))
     # Define colormap and normalization: negative (blue), zero (white), positive (red)
@@ -229,9 +237,12 @@ def _viz_diff_grid_points_binary(ground_truth: np.ndarray, prediction: np.ndarra
     ax.set_ylabel('Row index', fontsize=font_size)
     ax.tick_params(axis='both', which='both', labelsize=tick_size)
     fig.tight_layout()
-    plt.show()
+    plt.savefig(os.path.join(output_dir, f"diff_grid_points_binary_{model_name}.png"))
     
-def _viz_diff_grid_points_percentage(ground_truths: np.ndarray, predictions: np.ndarray):
+def _plot_diff_grid_points_percentage(ground_truths: np.ndarray, 
+                                     predictions: np.ndarray, 
+                                     model_name: str, 
+                                     output_dir: str):
     """
     Visualize the percentage error of the prediction with three cases:
       1) mean relative error
@@ -298,13 +309,14 @@ def _viz_diff_grid_points_percentage(ground_truths: np.ndarray, predictions: np.
     cbar = fig.colorbar(im, cax=cbar_ax, orientation='horizontal')
     cbar.set_label('Error (%)', fontsize=12)
     cbar.ax.tick_params(labelsize=10)
-    plt.show()
+    plt.savefig(os.path.join(output_dir, f"diff_grid_points_percentage_{model_name}.png"))
     
-def _viz_all_2d_maps_in_one_plot(ground_truths: np.ndarray, 
-                                 predictions: np.ndarray,
-                                 qoi: str, 
-                                 hill_path: Optional[str] = None,
-                                 ):
+def _plot_error_maps(ground_truths: np.ndarray, 
+                     predictions: np.ndarray,
+                     qoi: str, 
+                     model_name: str,
+                     output_dir: str,
+                     hill_path: Optional[str] = None):
     """
     Visualize all 2D maps in one plot.
 
@@ -412,25 +424,46 @@ def _viz_all_2d_maps_in_one_plot(ground_truths: np.ndarray,
         ax.tick_params(axis='both', which='both', labelsize=tick_size)
     fig.subplots_adjust(top=0.9)
     fig.tight_layout()
-    plt.show()
+    plt.savefig(os.path.join(output_dir, f"error_maps_{model_name}.png"))
     
-def viz_output_distribution(ground_truth: np.ndarray, qoi: str = "hmax"):
-    if qoi not in ["hmax", "vmax", "cmax"]:
+def plot_output_distribution(df_output_values: pd.DataFrame,
+                             output_dir: str,
+                             qoi: str | None = None):
+    if qoi is not None and qoi not in ["hmax", "vmax", "cmax"]:
         raise ValueError(f"Invalid quantity of interest: {qoi}")
     if qoi == "hmax":
         label = "Flow Height [m]"
     elif qoi == "vmax":
         label = "Flow Velocity [m/s]"
-    else:
+    elif qoi == "cmax":
         label = "Pollutant Concentration"
-    plt.figure()
-    plt.hist(ground_truth.flatten(), bins=30, density=True, edgecolor='k')
-    plt.xlabel(label)
-    plt.ylabel('Density')
-    plt.show()
+    else:
+        label = "Prediction"
+        
+    # Split violins: each model shows GT (left) vs Prediction (right)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    colors = sns.color_palette("muted", n_colors=len(df_output_values["Model"].unique()))
 
-def viz_prediction(ground_truth: np.ndarray, predictions: np.ndarray, problem_type: str = "high_dim_output", is_in_latent_space=False, threshold: float = 0.5):
-    assert problem_type in ["high_dim_output", "high_dim_input"], "Problem type must be 'high_dim_output' or 'high_dim_input'"
+    sns.violinplot(
+        data=df_output_values, x="Model", y="Value", hue="Source",
+        split=True, inner="quart", cut=0, density_norm="area", gap=.05, 
+        palette=["#4C72B0", "#DD8452"],  alpha=0.85
+    )
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    ax.set_xlabel("Model", fontsize=14)
+    ax.set_ylabel(label, fontsize=14)
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0 + box.height * 0.1,
+                    box.width, box.height * 0.9])
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1),
+            fancybox=True, ncol=5, fontsize=12)
+    fig.tight_layout()
+    plt.savefig(os.path.join(output_dir, f"output_distribution_violin.png"))
+
+def plot_prediction(ground_truth: np.ndarray, 
+                   predictions: np.ndarray, 
+                   model_name: str,
+                   output_dir: str):
     if ground_truth.ndim == 1:
         ground_truth = ground_truth.reshape(-1, 1)
     if predictions.ndim == 2 and ground_truth.shape[1] == 1:
@@ -447,9 +480,6 @@ def viz_prediction(ground_truth: np.ndarray, predictions: np.ndarray, problem_ty
     plt.figure()
     y_true = ground_truth.flatten()
     y_pred = prediction_mean.flatten()
-    if not is_in_latent_space and problem_type == "high_dim_output":
-        y_true = np.where(y_true < threshold, 0, y_true)
-        y_pred = np.where(y_pred < threshold, 0, y_pred)
     plt.plot([np.min(y_true),np.max(y_true)], [np.min(y_true),np.max(y_true)], color='black')
     if prediction_std is not None:
         pred_std = prediction_std.flatten()
@@ -459,7 +489,7 @@ def viz_prediction(ground_truth: np.ndarray, predictions: np.ndarray, problem_ty
                      markersize=6,
                      markeredgewidth=1.0,
                      markerfacecolor='None',
-                     ecolor='lightsteelblue',
+                     ecolor='cornflowerblue',
                      elinewidth=0.5,
                      capsize=2,
                      alpha=0.8,  
@@ -471,7 +501,7 @@ def viz_prediction(ground_truth: np.ndarray, predictions: np.ndarray, problem_ty
                      markersize=6,
                      markeredgewidth=1.0,
                      markerfacecolor='None',
-                     ecolor='lightsteelblue',
+                     ecolor='cornflowerblue',
                      elinewidth=0.5,
                      capsize=2, 
                      alpha=0.8,  
@@ -484,13 +514,13 @@ def viz_prediction(ground_truth: np.ndarray, predictions: np.ndarray, problem_ty
     plt.ylim(np.min(y_true),np.max(y_true))
     plt.legend(fontsize=14)
     plt.tight_layout()
-    plt.show()
+    plt.savefig(os.path.join(output_dir, f"prediction_vs_ground_truth_{model_name}.png"))
     
-def viz_residuals(
+def plot_residuals(
     ground_truth: np.ndarray, 
     predictions: np.ndarray, 
-    is_in_latent_space=False, threshold: float = 0.5
-):
+    model_name: str,
+    output_dir: str):
     if ground_truth.ndim == 1:
         ground_truth = ground_truth.reshape(-1, 1)
     if predictions.ndim == 2 and ground_truth.shape[1] == 1:
@@ -506,9 +536,6 @@ def viz_residuals(
         raise ValueError(f"The dimension of predictions must be 2d or 3d np.ndarray, but got {predictions.ndim}.")
     y_true = ground_truth.flatten()
     y_pred = prediction_mean.flatten()
-    if not is_in_latent_space:
-        y_true = np.where(y_true < threshold, 0, y_true)
-        y_pred = np.where(y_pred < threshold, 0, y_pred)
     residuals = y_pred - y_true
     plt.figure()
     ax = plt.gca()
@@ -521,7 +548,7 @@ def viz_residuals(
             markersize=6,
             markeredgewidth=1.0,
             markerfacecolor='none',
-            ecolor='lightsteelblue',
+            ecolor='cornflowerblue',
             elinewidth=0.5,
             capsize=2,
             alpha=0.8,
@@ -541,13 +568,14 @@ def viz_residuals(
     ax.legend(loc='upper right', fontsize=14)
     ax.tick_params(axis='both', which='both', labelsize=12)
     plt.tight_layout()
-    plt.show()
+    plt.savefig(os.path.join(output_dir, f"residuals_{model_name}.png"))
     
-def viz_output_image(ground_truths: np.ndarray, 
+def plot_output_image(ground_truths: np.ndarray, 
                      predictions_mean: np.ndarray,
                      output_img_params: dict, 
+                     model_name: str,
+                     output_dir: str,
                      qoi: str = "hmax", 
-                     threshold: float = 0.5,
                      x_ticks: Optional[list | np.ndarray] = None,
                      y_ticks: Optional[list | np.ndarray] = None,
                      use_nonlinear_scale_colormap: bool = False,
@@ -560,17 +588,18 @@ def viz_output_image(ground_truths: np.ndarray,
     cols = output_img_params["output_img_cols"]
     bg_img_path = output_img_params["background_img_path"]
     
-    # Masking
-    ground_truths_masked = np.where(ground_truths < threshold, 0.0, ground_truths)
-    predictions_mean_masked = np.where(predictions_mean < threshold, 0.0, predictions_mean)
-    
     # Reconstruct to image visualization
-    gts, gt_mean, gt_std = _reconstruct_output_image(ground_truths_masked, rows, cols, valid_cols)
-    preds, pred_mean, pred_std = _reconstruct_output_image(predictions_mean_masked, rows, cols, valid_cols)
-    _viz_output_image(gt_mean, gt_std, pred_mean, pred_std, qoi, bg_img_path, x_ticks, y_ticks, use_nonlinear_scale_colormap, power_gamma, prediction_cmap, diff_cmap, show_std_maps)
+    gts, gt_mean, gt_std = _reconstruct_output_image(ground_truths, rows, cols, valid_cols)
+    preds, pred_mean, pred_std = _reconstruct_output_image(predictions_mean, rows, cols, valid_cols)
+    _plot_output_image(gt_mean, gt_std, pred_mean, pred_std, qoi, model_name, output_dir, bg_img_path, x_ticks, y_ticks, use_nonlinear_scale_colormap, power_gamma, prediction_cmap, diff_cmap, show_std_maps)
     return gts, preds, gt_mean, pred_mean, gt_std, pred_std
     
-def viz_diff_grid_points(ground_truths: np.ndarray, predictions_mean: np.ndarray, output_img_params: dict, mode: str, threshold: float = 0.5):
+def plot_diff_grid_points(ground_truths: np.ndarray, 
+                         predictions_mean: np.ndarray, 
+                         output_img_params: dict, 
+                         mode: str, 
+                         model_name: str,
+                         output_dir: str):
     """
     Visualize the difference between ground-truth and prediction in the grid points.
 
@@ -583,59 +612,46 @@ def viz_diff_grid_points(ground_truths: np.ndarray, predictions_mean: np.ndarray
     valid_cols = output_img_params["filtered_columns"]
     rows = output_img_params["output_img_rows"]
     cols = output_img_params["output_img_cols"]
-    # Masking
-    ground_truths_masked = np.where(ground_truths < threshold, 0, ground_truths)
-    predictions_mean_masked = np.where(predictions_mean < threshold, 0, predictions_mean)
     # Reconstruct to image visualization
-    gts, gt_mean, _ = _reconstruct_output_image(ground_truths_masked, rows, cols, valid_cols)
-    preds, pred_mean, _ = _reconstruct_output_image(predictions_mean_masked, rows, cols, valid_cols)
+    gts, gt_mean, _ = _reconstruct_output_image(ground_truths, rows, cols, valid_cols)
+    preds, pred_mean, _ = _reconstruct_output_image(predictions_mean, rows, cols, valid_cols)
     if mode == "binary":
-        _viz_diff_grid_points_binary(gt_mean, pred_mean)
+        _plot_diff_grid_points_binary(gt_mean, pred_mean, model_name, output_dir)
     elif mode == "percentage":
-        _viz_diff_grid_points_percentage(gts, preds)
+        _plot_diff_grid_points_percentage(gts, preds, model_name, output_dir)
     else:
         raise ValueError(f"Mode must be 'binary' or 'percentage', but got {mode}")
     
-def viz_all_2d_maps_in_one_plot(
+def plot_error_maps(
     ground_truth: np.ndarray, 
     predictions_mean: np.ndarray, 
     output_img_params: dict, 
+    model_name: str,
+    output_dir: str,
     qoi: str = "hmax", 
-    threshold: float = 0.5
     ):
     valid_cols = output_img_params["filtered_columns"]
     rows = output_img_params["output_img_rows"]
     cols = output_img_params["output_img_cols"]
     bg_img_path = output_img_params.get("background_img_path", None)
-    # Masking
-    ground_truths_masked = np.where(ground_truth < threshold, 0, ground_truth)
-    predictions_mean_masked = np.where(predictions_mean < threshold, 0, predictions_mean)
     # Reconstruct to image visualization
-    gts, gt_mean, _ = _reconstruct_output_image(ground_truths_masked, rows, cols, valid_cols)
-    preds, pred_mean, _ = _reconstruct_output_image(predictions_mean_masked, rows, cols, valid_cols)
-    _viz_all_2d_maps_in_one_plot(gts, preds, qoi, bg_img_path)
+    gts, gt_mean, _ = _reconstruct_output_image(ground_truth, rows, cols, valid_cols)
+    preds, pred_mean, _ = _reconstruct_output_image(predictions_mean, rows, cols, valid_cols)
+    _plot_error_maps(gts, preds, qoi, model_name, output_dir, bg_img_path)
     
-def plot_pca_zero_output_hist(ground_truth: np.ndarray, predictions: dict, threshold: float = 0.5):
+def plot_pca_zero_output_hist(model_predictions: list[np.ndarray],
+                              model_names: list[str],
+                              ground_truths: np.ndarray, 
+                              output_dir: str):
     """
     Plot the histogram of the zero output.
     """
-    # Masking
-    ground_truth = np.where(ground_truth < threshold, 0, ground_truth)
-    arrs = [ground_truth]
+    assert len(model_predictions) == len(model_names)
+    arrs = [ground_truths]
     labels = ['Ground-truth']
-    for model_name, prediction in predictions.items():
-        prediction = np.where(prediction < threshold, 0, prediction)
+    for model_name, prediction in zip(model_names, model_predictions):
         arrs.append(prediction)
-        if model_name == "ppgasp":
-            labels.append("PPGaSP")
-        if model_name == "pca_ppgasp":
-            labels.append("PCA-PPGaSP")
-        if model_name == "bigp":
-            labels.append("BiGP")
-        if model_name == "pca_bigp":
-            labels.append("PCA-BiGP")
-        if model_name == "lmc":
-            labels.append("LMC")
+        labels.append(model_name)
     
     colors = [f'C{i}' for i in range(len(arrs))]
     zero_counts = [np.count_nonzero(arr == 0) for arr in arrs]
@@ -646,8 +662,44 @@ def plot_pca_zero_output_hist(ground_truth: np.ndarray, predictions: dict, thres
     ax.bar(x, zero_counts, width, color=colors)
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=30, ha='right')
-    ax.set_ylabel('Number of zero values')
+    ax.set_ylabel('Amounts of zero outputs')
     plt.tight_layout()
-    plt.show()
-    
+    plt.savefig(os.path.join(output_dir, f"comparison_zero_output_hist.png"))
 
+def plot_rmse_vs_train_time(benchmark_metrics, output_dir):
+    names = list(benchmark_metrics.keys())
+    rmses = [benchmark_metrics[name]["rmse"] for name in names]
+    train_times = [benchmark_metrics[name]["train_time"] for name in names]
+    plt.figure()
+    tab10 = plt.get_cmap("tab10").colors
+    markers = ["o", "s", "^", "D", "X", "v", "*", "P"]
+    for i, name in enumerate(names):
+        color = tab10[i % len(tab10)]
+        marker = markers[i % len(markers)]
+        plt.scatter(train_times[i], rmses[i], color=color, marker=marker, s=70, label=name, edgecolors="black", linewidths=0.6, zorder=3)
+    plt.xlabel("Training time (sec)")
+    plt.ylabel("RMSE")
+    plt.title("RMSE vs Training Time")
+    plt.grid(True, linestyle=":", linewidth=0.6, zorder=0)
+    plt.legend(title="Model")
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "rmse_vs_training_time.png"))
+
+def plot_coverage_prob(benchmark_metrics, output_dir):
+    model_names = list(benchmark_metrics.keys())
+    coverage_probs = [benchmark_metrics[name]["coverage_prob"] for name in model_names]
+    x = np.arange(len(model_names))
+    width = 0.55
+    tab10 = plt.get_cmap("tab10").colors
+    bar_colors = [tab10[i % len(tab10)] for i in range(len(model_names))]
+    fig, ax = plt.subplots(figsize=(9,5))
+    ax.bar(x, coverage_probs, width=width, color=bar_colors, zorder=2)
+    ax.axhline(0.95, color="black", linestyle="--", linewidth=2)
+    ax.set_xticks(x)
+    ax.set_xticklabels(model_names)
+    ax.set_xlabel("Model", fontsize=14)
+    ax.set_ylabel("Coverage Probability", fontsize=14)
+    ax.grid(axis="y", linestyle=":", linewidth=0.6, zorder=0)
+    ax.margins(x=0.02)
+    fig.tight_layout()
+    plt.savefig(os.path.join(output_dir, "coverage_prob.png"))
