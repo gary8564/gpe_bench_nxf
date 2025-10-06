@@ -105,23 +105,23 @@ workflow {
 
         // 3. Train and inference (subset of models for high-dim output)
         def ppgasp_ch      = evaluate_ppgasp(processed_ch)
-        def bigp_ch        = evaluate_bigp(processed_ch)
-        def pca_bigp_ch    = evaluate_pca_bigp(processed_ch)
-        def mtgp_ch        = evaluate_mtgp(processed_ch)
         def pca_ppgasp_ch  = evaluate_pca_ppgasp(processed_ch)
         def kpca_ppgasp_ch = evaluate_kpca_ppgasp(processed_ch)
         def ae_ppgasp_ch   = evaluate_ae_ppgasp(processed_ch)
         def vae_ppgasp_ch  = evaluate_vae_ppgasp(processed_ch)
+        def bigp_ch        = evaluate_bigp(processed_ch)
+        def pca_bigp_ch    = evaluate_pca_bigp(processed_ch)
+        def mtgp_ch        = evaluate_mtgp(processed_ch)
 
         // 4. Gather metrics and benchmark
         def metrics_list_ch = ppgasp_ch.ppgasp
-                                .mix(bigp_ch.bigp)
-                                .mix(pca_bigp_ch.pca_bigp)
-                                .mix(mtgp_ch.mtgp)
                                 .mix(pca_ppgasp_ch.pca_ppgasp)
                                 .mix(kpca_ppgasp_ch.kpca_ppgasp)
                                 .mix(ae_ppgasp_ch.ae_ppgasp)
                                 .mix(vae_ppgasp_ch.vae_ppgasp)
+                                .mix(bigp_ch.bigp)
+                                .mix(pca_bigp_ch.pca_bigp)
+                                .mix(mtgp_ch.mtgp)
                                 .map { path -> path.toString() }
                                 .collect()
         benchmark_metrics(metrics_list_ch)
