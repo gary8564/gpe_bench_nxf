@@ -7,4 +7,8 @@ dependencies:
   - pandas
   - matplotlib
   - seaborn
+  - rasterio
   - h5py
+  - pip
+  - pip:
+      - -e ..

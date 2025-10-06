@@ -1,8 +1,8 @@
    caseStudy: synthetic_100d_function   # name of the case study, should exist in datasets.config
    problem_type: high_dim_input         # high_dim_input | high_dim_output
    outDir: results                      # name of the output directory
-   useGPU: true                        # true/false
-   condaEngine: micromamba             # conda/mamba/micromamba
+   useGPU: false                        # true/false
+   condaEngine: conda             # conda/mamba/micromamba
    # The following params are used by high_dim_output workflow
    # threshold: 5e-06                     # zero-truncation threshold for outputs
    # n_components: 10                     # PCA/kPCA components

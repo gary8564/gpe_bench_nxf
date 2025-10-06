@@ -10,7 +10,9 @@ dependencies:
   - gpytorch
   - tqdm
   - matplotlib
+  - scikit-learn
   - seaborn
+  - rasterio
   - pip
   - pip:
       - -e ..

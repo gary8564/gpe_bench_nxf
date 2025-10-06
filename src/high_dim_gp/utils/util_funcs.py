@@ -1,11 +1,9 @@
 import numpy as np
-from beartype import beartype
-from high_dim_gp.dr import InputDimReducer
+from high_dim_gp.dr.pca import InputDimReducer
 import copy
 import torch
 import torch.nn as nn
 
-@beartype
 def reduced_dim(reducer: InputDimReducer | None, X: np.ndarray) -> int:
     """Helper function to obtain the input dimension
 

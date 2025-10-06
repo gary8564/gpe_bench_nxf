@@ -44,7 +44,7 @@ class ErrorMetrics:
 
     @staticmethod
     def RMSE(predictions: np.ndarray, observations: np.ndarray) -> float:
-        """Normalized Root-Mean-Square Error (NRMSE)
+        """Root-Mean-Square Error (RMSE)
 
         Args:
             predictions (np.ndarray): predictions
@@ -55,7 +55,7 @@ class ErrorMetrics:
             UserWarning: if mean of observations is zero
 
         Returns:
-            float: NRMSD [1]
+            float: RMSE
         """
         if predictions.size != observations.size:
             raise ValueError("predictions and measurements must be of equal size")

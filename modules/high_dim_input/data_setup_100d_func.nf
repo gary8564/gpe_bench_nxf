@@ -1,5 +1,5 @@
 process data_setup_100d_func {
-  conda "${workflow.launchDir}/envs/data_setup_synthetic.yml"
+  conda "${workflow.launchDir}/envs/data_setup_100d_func.yml"
   tag "${caseStudy}"
   
   input:
