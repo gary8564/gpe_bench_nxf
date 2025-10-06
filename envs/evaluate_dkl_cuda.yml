@@ -14,6 +14,10 @@ dependencies:
   - matplotlib
   - scikit-learn
   - seaborn
+<<<<<<< HEAD
+=======
+  - scikit-learn
+>>>>>>> c1b988f113c81ecbaf74af99c42e2e3c365720dc
   - rasterio
   - pip
   - pip:
