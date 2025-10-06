@@ -13,6 +13,8 @@ dependencies:
   - tqdm
   - matplotlib
   - seaborn
+  - scikit-learn
+  - rasterio
   - pip
   - pip:
       - -e ..

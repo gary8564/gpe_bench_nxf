@@ -17,6 +17,8 @@ dependencies:
   - tqdm
   - matplotlib
   - seaborn
+  - scikit-learn
+  - rasterio
   - psimpy
   - pip
   - pip:
