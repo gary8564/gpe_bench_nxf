@@ -3,7 +3,7 @@ import time
 from typing import Optional
 from sklearn.preprocessing import StandardScaler
 from psimpy.emulator import ScalarGaSP, PPGaSP
-from high_dim_gp.dr import InputDimReducer, OutputDimReducer
+from high_dim_gp.dr.pca import InputDimReducer, OutputDimReducer
 
 class PCAScalarGaSP:
     def __init__(self,
@@ -98,25 +98,23 @@ class PCAPPGaSP:
         self.output_dim_reducer = output_dim_reducer
         self.original_input_dim = None
         self.original_output_dim = None
-        self.input_scaler = StandardScaler()
-        self.output_scaler = StandardScaler()
         
-    def _postprocess_testing_output(self, predictions: np.ndarray, uncertainty_reconstruction: bool = False):
+    def _postprocess_testing_output(self, predictions: np.ndarray, scaler_mean: np.ndarray, scaler_scale: np.ndarray, uncertainty_reconstruction: bool = False):
         """
         Post-process the PCA-GaSP predictions by converting the emulator's output
         in the reduced space back to the original output space.
         
         Parameters:
-            predictions: 
-                        Predicted results (mean, lower 95, upper 95, sd) of the trained emulator.
-            uncertainty_reconstruction: 
-                        whether or not to reconstruct the uncertainty quantification from latent reduced space to original dimension space.
+            predictions: Predicted results (mean, lower 95, upper 95, sd) of the trained emulator.
+            scaler_mean: Mean of the output scaler.
+            scaler_scale: Scale of the output scaler.
+            uncertainty_reconstruction: Whether or not to reconstruct the uncertainty quantification from latent reduced space to original dimension space.
     
         Returns:
-            predictions_mean
-            predictions_lower_95
-            predictions_upper_95
-            predictions_std
+            predictions_mean: Predicted results (mean, lower 95, upper 95, sd) of the trained emulator.
+            predictions_lower_95: Predicted results (lower 95) of the trained emulator.
+            predictions_upper_95: Predicted results (upper 95) of the trained emulator.
+            predictions_std: Predicted results (sd) of the trained emulator.
         """
         if not (predictions.ndim == 3):
             raise ValueError("predictions must be 3d numpy array.")
@@ -129,7 +127,7 @@ class PCAPPGaSP:
         try:
             mean_reduced = predictions[:, :, 0]
             mean_original = self.output_dim_reducer.inverse_transform(mean_reduced)
-            mean_original = self.output_scaler.inverse_transform(mean_original)
+            mean_original = mean_original * scaler_scale + scaler_mean
             lower_CI, upper_CI, std_original = None, None, None  
             if uncertainty_reconstruction:
                 std_reduced = predictions[:, :, 3]
@@ -137,7 +135,7 @@ class PCAPPGaSP:
                     W = self.output_dim_reducer.reducer.model.components_
                     # Propagate diagonal covariance from latent space to original space:
                     var_standardized = (std_reduced ** 2) @ (W ** 2)
-                    std_original = np.sqrt(var_standardized) * self.output_scaler.scale_
+                    std_original = np.sqrt(var_standardized) * scaler_scale
                 else:  
                     num_mc_samples = 100
                     # Generate samples in reduced space
@@ -148,7 +146,7 @@ class PCAPPGaSP:
                     original_samples = np.zeros((num_test, original_dim, num_mc_samples))
                     latent_flat = latent_samples.transpose(0, 2, 1).reshape(num_test * num_mc_samples, reduced_dim)
                     original_flat = self.output_dim_reducer.inverse_transform(latent_flat)
-                    original_flat = self.output_scaler.inverse_transform(original_flat)
+                    original_flat = original_flat * scaler_scale + scaler_mean
                     original_samples = original_flat.reshape(num_test, num_mc_samples, original_dim).transpose(0, 2, 1)
                     # Compute statistics across samples
                     std_original = np.std(original_samples, axis=2)
@@ -165,10 +163,6 @@ class PCAPPGaSP:
         # Store original dimensions
         self.original_input_dim = design.shape[1]
         self.original_output_dim = response.shape[1]
-        
-        # Data standardization
-        design = self.input_scaler.fit_transform(design)
-        response = self.output_scaler.fit_transform(response)
         
         # Apply input PCA if specified
         if self.input_dim_reducer is not None:
@@ -208,11 +202,15 @@ class PCAPPGaSP:
         
     def predict(self, 
                 testing_input: np.ndarray,
+                scaler_mean: np.ndarray,
+                scaler_scale: np.ndarray,
                 testing_trend: Optional[np.ndarray] = None, 
                 uncertainty_reconstruction: bool = False):
         """
         Args:
             testing_input (np.ndarray): input data for inference
+            scaler_mean (np.ndarray): mean of the output standardizer 
+            scaler_scale (np.ndarray): scale of the output standardizer
             testing_trend (Optional[np.ndarray], optional): trend function. Defaults to None.
             uncertainty_reconstruction (bool, optional): whether to propagate the uncertainty quantification from latent reduced space to original dimension space. Defaults to False.
             
@@ -230,9 +228,6 @@ class PCAPPGaSP:
         # Validate input dimensions
         if testing_input.shape[1] != self.original_input_dim:
             raise ValueError(f"Expected input dimension {self.original_input_dim}, got {testing_input.shape[1]}")
-        
-        # Data standardization
-        testing_input = self.input_scaler.transform(testing_input)
             
         # Reduce input dimension if needed
         if self.input_dim_reducer is not None:
@@ -251,7 +246,7 @@ class PCAPPGaSP:
             predictions_latent = self.emulator.predict(testing_input=test_X, testing_trend=testing_trend)
 
             # Post-process predictions
-            predictions_mean_orig, lower_CI, upper_CI, std_orig = self._postprocess_testing_output(predictions_latent, uncertainty_reconstruction)            
+            predictions_mean_orig, lower_CI, upper_CI, std_orig = self._postprocess_testing_output(predictions_latent, scaler_mean, scaler_scale, uncertainty_reconstruction)            
             infer_time = (time.time() - start_time)
             print(f"Inference PCAPPGaSP takes {infer_time:.3f} s")
             
@@ -272,8 +267,7 @@ class PCAPPGaSP:
         except Exception as e:
             raise RuntimeError(f"Error in prediction: {str(e)}")
 
-    def sample(self, testing_input: np.ndarray, nsamples: int = 1, testing_trend: Optional[np.ndarray] = None) -> np.ndarray:
-        testing_input = self.input_scaler.transform(testing_input)
+    def sample(self, testing_input: np.ndarray, scaler_mean: np.ndarray, scaler_scale: np.ndarray, nsamples: int = 1, testing_trend: Optional[np.ndarray] = None) -> np.ndarray:
         if self.input_dim_reducer is not None:
             testing_input = self.input_dim_reducer.transform(testing_input)
         samples = self.emulator.sample(testing_input, nsamples, testing_trend)
@@ -282,10 +276,14 @@ class PCAPPGaSP:
             original_dim = self.output_dim_reducer.reducer.model.n_features_in_
             samples_flat = samples.transpose(0, 2, 1).reshape(ntest * nsamples, n_reduced)
             orig_flat = self.output_dim_reducer.inverse_transform(samples_flat)
-            orig_flat = self.output_scaler.inverse_transform(orig_flat)
+            orig_flat = orig_flat * scaler_scale + scaler_mean
             samples_original = orig_flat.reshape(ntest, nsamples, original_dim).transpose(0, 2, 1)
             return samples_original
         else:
+            ntest, ndim, _ = samples.shape
+            samples_flat = samples.transpose(0, 2, 1).reshape(ntest * nsamples, ndim)
+            samples_flat = samples_flat * scaler_scale + scaler_mean
+            samples = samples_flat.reshape(ntest, nsamples, ndim).transpose(0, 2, 1)
             return samples
     
     def get_range_param(self):

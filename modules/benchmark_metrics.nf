@@ -1,4 +1,5 @@
 process benchmark_metrics {
+  conda "${workflow.launchDir}/envs/benchmark_metrics.yml"
   tag "benchmark_metrics"
   publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
   
@@ -14,6 +15,8 @@ process benchmark_metrics {
   """
   python ${workflow.launchDir}/scripts/benchmark_metrics.py \
     --metrics-paths '${metrics_list}' \
-    --output-dir benchmark_results
+    --output-dir benchmark_results \
+    --problem-type ${params.problem_type} \
+    ${params.problem_type == 'high_dim_output' ? "--qoi ${params.qoi}" : ''}
   """
 }

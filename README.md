@@ -207,10 +207,3 @@ This workflow demonstrates **programming language agnosticism** in scientific co
 
 
 ## Benchmark Results
-DKL and ExactGP implemented in GPytorch can benefits from GPU acceleration, whereas RGaSP cannot. 
-### Synthetic Case
-![benchmark_results_synthetic](results/synthetic_100d_function/benchmark_results/rmse_vs_training_time.png)
-
-### Tsunami Case
-Noted that for tsunami case study, which input dimension (21600) is extremely high, traininng RGaSP will face numerical instability issue (covariance matrix is ill-conditioned and gets inf/nan values). Hence, only PCA-RGaSP, ExactGP, DKL are considered here. 
-![benchmark_results_tsunami](results/tsunami_tokushima/benchmark_results/rmse_vs_training_time.png)

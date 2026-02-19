@@ -60,16 +60,18 @@ class SVGP_LMC(gpytorch.models.ApproximateGP):
         
         # Perform PCA on the output data
         pca = PCA(n_components=max_components)
-        pca.fit(train_Y.detach().numpy())
+        pca.fit(train_Y.cpu().detach().numpy())
         
         # Use PCA components to initialize the LMC coefficients
         with torch.no_grad():
+            # Determine target device from existing parameter
+            target_device = self.variational_strategy.lmc_coefficients.device
             # PCA components are [max_components, n_features], we need [num_latents, num_tasks]
-            pca_components = torch.tensor(pca.components_, dtype=torch.float32)  # [max_components, num_tasks]
+            pca_components = torch.tensor(pca.components_, dtype=torch.float32, device=target_device)  # [max_components, num_tasks]
             
             # If we have fewer PCA components than rank, pad with random values
             if max_components < self.rank:
-                additional_components = torch.randn(self.rank - max_components, n_features) * 0.1
+                additional_components = torch.randn(self.rank - max_components, n_features, device=target_device) * 0.1
                 pca_components = torch.cat([pca_components, additional_components], dim=0)
             
             # lmc_coefficients expects shape [num_latents, num_tasks]
@@ -182,7 +184,7 @@ class MultiTaskGP:
         
         # Adaptive rank selection based on data characteristics
         pca = PCA()
-        pca.fit(train_Y.detach().numpy())
+        pca.fit(train_Y.cpu().detach().numpy())
         cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
         
         # More conservative rank selection for geophysical data
@@ -219,7 +221,7 @@ class MultiTaskGP:
         if n_samples >= self.num_inducing:
             # Use k-means clustering
             kmeans = KMeans(n_clusters=self.num_inducing, random_state=42, n_init=10)
-            cluster_centers = kmeans.fit(self.train_X.detach().cpu().numpy()).cluster_centers_
+            cluster_centers = kmeans.fit(self.train_X.cpu().detach().numpy()).cluster_centers_
             # Shape: [num_inducing, input_dim]
             inducing_points_2d = torch.tensor(cluster_centers, dtype=torch.float32, device=self.device)
         else:
@@ -309,7 +311,7 @@ class MultiTaskGP:
 
     def _initialize_noise(self, output_dim):
         """Initialize noise parameters"""
-        noise_init = 0.05 * torch.ones(output_dim)  # Smaller initial noise
+        noise_init = 0.05 * torch.ones(output_dim, device=self.device)  # Smaller initial noise
         with torch.no_grad():
             if self.likelihood.has_task_noise and self.likelihood.rank == 0:
                 self.likelihood.task_noises = noise_init

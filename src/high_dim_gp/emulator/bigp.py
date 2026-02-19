@@ -112,16 +112,19 @@ class BatchIndependentMultioutputGPModel(ExactGP):
         inner = self._get_inner_kernel(self.covar_module)
         n_samples = train_x.shape[0]
         input_dim = float(self.input_dim)
+        # Ensure we initialize using the same device as kernel parameters
+        param_device = inner.raw_lengthscale.device
+        feature_ranges = feature_ranges.to(param_device)
         # Initialize lengthscales using empirical scaling
         scaling_factors = feature_ranges / (n_samples ** (1.0 / input_dim))
         init_lengthscales = 3.0 * scaling_factors
         inner.initialize(lengthscale=init_lengthscales.unsqueeze(0))
-        # Set lower bounds for lengthscales in raw space
-        lower_bounds = -torch.log(torch.tensor(0.1)) / (feature_ranges * input_dim)
+        # Set lower bounds for lengthscales in raw space (on the kernel param device)
+        lower_bounds = -torch.log(torch.tensor(0.1, device=param_device)) / (feature_ranges * input_dim)
         raw_lb = torch.log(torch.exp(lower_bounds) - 1.0)
         inner.register_constraint("raw_lengthscale", GreaterThan(raw_lb))
-        # Initialize outputscale
-        init_outputscale = train_y.var(dim=0).mean().sqrt()
+        # Initialize outputscale on the same device as kernel parameters
+        init_outputscale = train_y.var(dim=0).mean().sqrt().to(param_device)
         self.covar_module.outputscale = init_outputscale
 
     def tie_parameters_across_tasks(self):
@@ -158,13 +161,11 @@ class BiGP:
                  device: str, 
                  kernel_type: str = 'matern_5_2', 
                  method: str = 'post_mode',
-                 prior_weight: float = 0.25,
-                 normalize: bool = True):
+                 prior_weight: float = 0.25):
         self.device = torch.device(device)
         self.kernel_type = kernel_type
         self.method = method  # 'post_mode' or 'mle'
         self.prior_weight = float(prior_weight)
-        self.normalize = bool(normalize)
     
     def train(self,
               train_X: np.ndarray | torch.Tensor, train_Y: np.ndarray | torch.Tensor, 
@@ -181,20 +182,6 @@ class BiGP:
             self.train_Y = train_Y
         self.train_X, self.train_Y = self.train_X.to(self.device), self.train_Y.to(self.device)
 
-        # Normalize X to [0, 1] and Y to zero-mean/unit-std
-        if self.normalize:
-            x_min = self.train_X.min(dim=0).values
-            x_max = self.train_X.max(dim=0).values
-            x_range = (x_max - x_min).clamp_min(1e-12)
-            self.x_min = x_min
-            self.x_range = x_range
-            self.train_X = (self.train_X - self.x_min) / self.x_range
-
-            y_mean = self.train_Y.mean(dim=0)
-            y_std = self.train_Y.std(dim=0).clamp_min(1e-12)
-            self.y_mean = y_mean
-            self.y_std = y_std
-            self.train_Y = (self.train_Y - self.y_mean) / self.y_std
         # Define the multitask likelihood.
         self.likelihood = MultitaskGaussianLikelihood(
             num_tasks=self.train_Y.shape[1],
@@ -207,6 +194,11 @@ class BiGP:
         self.model.train()
         self.likelihood.train()
         mll = ExactMarginalLogLikelihood(self.likelihood, self.model)
+        # After moving to device, ensure any constraint lower bounds are also on the same device
+        inner_kernel = self.model._get_inner_kernel(self.model.covar_module)
+        constraint = inner_kernel.raw_lengthscale_constraint
+        if hasattr(constraint, 'lower_bound') and torch.is_tensor(constraint.lower_bound):
+            constraint.lower_bound = constraint.lower_bound.to(self.device)
         
         # Optimizer
         fine_tune_optimizer = None
@@ -310,8 +302,6 @@ class BiGP:
             self.test_X = test_X
         self.test_X = self.test_X.to(self.device)
 
-        if self.normalize:
-            self.test_X = (self.test_X - self.x_min) / self.x_range
         self.model.eval()
         self.likelihood.eval()
         start_time = time.time()
@@ -321,14 +311,6 @@ class BiGP:
         mean = predictions.mean
         std = predictions.stddev
         lower, upper = predictions.confidence_region()
-
-        # Denormalize Y if enabled
-        if self.normalize:
-            mean = mean * self.y_std + self.y_mean
-            std = std * self.y_std
-            lower = lower * self.y_std + self.y_mean
-            upper = upper * self.y_std + self.y_mean
-
         mean = mean.cpu().detach().numpy()
         std = std.cpu().detach().numpy()
         lower = lower.cpu().detach().numpy()
@@ -343,7 +325,6 @@ class PCA_BiGP(BiGP):
                  method: str = 'post_mode'):
         super().__init__(device, kernel_type, method)
         self.output_dim_reducer = output_dim_reducer
-        self.scaler = StandardScaler()
     
     def preprocess_dim_reduction(self, 
                                  train_X: np.ndarray,
@@ -354,63 +335,49 @@ class PCA_BiGP(BiGP):
         self.original_input_dim = train_X.shape[1]
         self.original_output_dim = train_Y.shape[1]
         
-        # Data standardization
-        training_dataset = np.hstack((train_X, train_Y))
-        training_dataset_scaled = self.scaler.fit_transform(training_dataset)
-        test_dataset = np.hstack((test_X, test_Y))
-        test_dataset_scaled = self.scaler.transform(test_dataset)
-        train_X_scaled = training_dataset_scaled[:, :self.original_input_dim]
-        train_Y_scaled = training_dataset_scaled[:, self.original_input_dim:]
-        test_X_scaled = test_dataset_scaled[:, :self.original_input_dim]
-        test_Y_scaled = test_dataset_scaled[:, self.original_input_dim:]
-        
         # Apply output PCA 
-        train_Y_scaled_reduced = self.output_dim_reducer.fit_transform(train_Y_scaled)
+        train_Y_reduced = self.output_dim_reducer.fit_transform(train_Y)
         # Verify reduced dimensions
-        assert train_Y_scaled_reduced.shape[1] == self.output_dim_reducer.reducer.n_components, \
-            f"Output PCA reduced to {train_Y_scaled_reduced.shape[1]} components, expected {self.output_dim_reducer.reducer.n_components}"
-        print(f"Reduced output dimension to {train_Y_scaled_reduced.shape[1]}.")
-        test_Y_scaled_reduced = self.output_dim_reducer.transform(test_Y_scaled)
-        return train_X_scaled, train_Y_scaled_reduced, test_X_scaled, test_Y_scaled_reduced
+        assert train_Y_reduced.shape[1] == self.output_dim_reducer.reducer.n_components, \
+            f"Output PCA reduced to {train_Y_reduced.shape[1]} components, expected {self.output_dim_reducer.reducer.n_components}"
+        print(f"Reduced output dimension to {train_Y_reduced.shape[1]}.")
+        test_Y_reduced = self.output_dim_reducer.transform(test_Y)
+        return train_X, train_Y_reduced, test_X, test_Y_reduced
     
     def postprocess_invert_back(self, 
                                 predictions_mean: np.ndarray, 
-                                predictions_std: np.ndarray = None):
+                                predictions_std: np.ndarray, 
+                                scaler_mean: np.ndarray,
+                                scaler_scale: np.ndarray):
         num_samples = predictions_mean.shape[0]
         # Transform reduced dimension back to original dimension 
         reconstructed_bands = self.output_dim_reducer.inverse_transform(predictions_mean)
         print(f"Inverse transform back to original output dimension: {reconstructed_bands.shape[1]}.")
         # Unnormalize data
-        mu = self.scaler.mean_[self.original_input_dim:]
-        sigma = self.scaler.scale_[self.original_input_dim:]
-        predictions_mean_original = reconstructed_bands * sigma + mu
-        std_original = None
-        lower_CI = None
-        upper_CI = None
-        if predictions_std is not None:
-            if hasattr(self.output_dim_reducer.reducer.model, "components_"):  
-                W = self.output_dim_reducer.reducer.model.components_
-                # Propagate diagonal covariance from latent space to original space:
-                var_standardized = (predictions_std ** 2) @ (W ** 2)
-                std_original = np.sqrt(var_standardized) * self.scaler.scale_[self.original_input_dim:]
-            else:  
-                num_mc_samples = 100
-                reduced_dim = self.output_dim_reducer.reducer.n_components
-                # Generate samples in reduced space
-                rng = np.random.default_rng()
-                latent_samples = rng.normal(loc=predictions_mean[:, :, None], scale=predictions_std[:, :, None], size=(num_samples, reduced_dim, num_mc_samples))
-                # Reconstruct original output space
-                original_dim = self.output_dim_reducer.reducer.model.n_features_in_
-                original_samples = np.zeros((num_samples, original_dim, num_mc_samples))
-                latent_flat = latent_samples.transpose(0, 2, 1).reshape(num_samples * num_mc_samples, reduced_dim)
-                original_flat = self.output_dim_reducer.inverse_transform(latent_flat)
-                original_flat = original_flat * sigma + mu
-                original_samples = original_flat.reshape(num_samples, num_mc_samples, original_dim).transpose(0, 2, 1)
-                # Compute statistics across samples
-                std_original = np.std(original_samples, axis=2)
-            margin = 1.96 * std_original
-            lower_CI = predictions_mean_original - margin
-            upper_CI = predictions_mean_original + margin 
+        predictions_mean_original = reconstructed_bands * scaler_scale + scaler_mean
+        if hasattr(self.output_dim_reducer.reducer.model, "components_"):  
+            W = self.output_dim_reducer.reducer.model.components_
+            # Propagate diagonal covariance from latent space to original space:
+            var_standardized = (predictions_std ** 2) @ (W ** 2)
+            std_original = np.sqrt(var_standardized) * scaler_scale
+        else:  
+            num_mc_samples = 100
+            reduced_dim = self.output_dim_reducer.reducer.n_components
+            # Generate samples in reduced space
+            rng = np.random.default_rng()
+            latent_samples = rng.normal(loc=predictions_mean[:, :, None], scale=predictions_std[:, :, None], size=(num_samples, reduced_dim, num_mc_samples))
+            # Reconstruct original output space
+            original_dim = self.output_dim_reducer.reducer.model.n_features_in_
+            original_samples = np.zeros((num_samples, original_dim, num_mc_samples))
+            latent_flat = latent_samples.transpose(0, 2, 1).reshape(num_samples * num_mc_samples, reduced_dim)
+            original_flat = self.output_dim_reducer.inverse_transform(latent_flat)
+            original_flat = original_flat * scaler_scale + scaler_mean
+            original_samples = original_flat.reshape(num_samples, num_mc_samples, original_dim).transpose(0, 2, 1)
+            # Compute statistics across samples
+            std_original = np.std(original_samples, axis=2)
+        margin = 1.96 * std_original
+        lower_CI = predictions_mean_original - margin
+        upper_CI = predictions_mean_original + margin 
         return predictions_mean_original, std_original, lower_CI, upper_CI
         
         

@@ -1,4 +1,11 @@
-   caseStudy: synthetic_100d_function  # name of the case study, should exist in datasets.config
-   outDir: results # name of the output directory
-   useGPU: false # true/false
-   condaEngine: conda # conda/mamba/micromamba
+   caseStudy: synthetic_100d_function   # name of the case study, should exist in datasets.config
+   problem_type: high_dim_input         # high_dim_input | high_dim_output
+   outDir: results                      # name of the output directory
+   useGPU: false                        # true/false
+   condaEngine: conda             # conda/mamba/micromamba
+   # The following params are used by high_dim_output workflow
+   # threshold: 5e-06                     # zero-truncation threshold for outputs
+   # n_components: 10                     # PCA/kPCA components
+   # latent_dim: 10                       # AE/VAE latent dimension
+   # Optional quantity of interest for data_setup_landslide: hmax or vmax
+   # qoi: hmax
