@@ -1,9 +1,7 @@
-def exactgpEnv = params.useGPU ? 'evaluate_exactgp_cuda' : 'evaluate_exactgp'
-
 process evaluate_exactgp {
   conda (params.useLockFiles
-    ? "${workflow.launchDir}/locks/${params.lockPlatform}/${exactgpEnv}.txt"
-    : "${workflow.launchDir}/envs/${exactgpEnv}.yml")
+    ? "${workflow.launchDir}/locks/${params.lockPlatform}/${params.useGPU ? 'evaluate_exactgp_cuda' : 'evaluate_exactgp'}.txt"
+    : "${workflow.launchDir}/envs/${params.useGPU ? 'evaluate_exactgp_cuda' : 'evaluate_exactgp'}.yml")
 
   tag "ExactGP"
   publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
