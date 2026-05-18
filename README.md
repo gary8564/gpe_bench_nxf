@@ -164,3 +164,13 @@ This workflow demonstrates **programming language agnosticism** in scientific co
 - **Per-process environment isolation:** Each Nextflow process can define its own Conda environment in `envs/`, allowing Python/GPyTorch, R/RobustGaSP, and other model-specific dependencies to remain isolated while still being orchestrated in one benchmark pipeline. This follows the SHOWME.how isolation principle: every computational unit should carry an explicit environment specification rather than relying on a manually configured local setup.
 
 - **Automatic `conda-lock` generation in CI:** To make the environments reproducible across local machines, CI runners, and SLURM/HPC execution, the pipeline can automatically regenerate [`conda-lock`](https://conda.github.io/conda-lock/) files whenever an `environment.yml` file changes. These lock files pin the fully resolved dependency graph for the target platform, reducing dependency drift and shifting environment maintenance from individual collaborators to a single CI workflow.
+
+## Comparison between Nextflow and Snakemake
+
+| Aspect             | Nextflow                              | Snakemake                                                                       |
+| ------------------ | ------------------------------------- | ------------------------------------------------------------------------------- |
+| Workflow language  | Groovy DSL                            | Python-based                                                                    |
+| Paradigm           | Channel-based (push; top-down)        | File-based DAG (pull; bottom-up)                                                |
+| Config             | `.config`                             | `.yaml`                                                                         |
+| Modules            | `modules/*.nf` (one process per file) | `rules/high_dim_input/*.smk`, `rules/high_dim_output/*.smk` (one rule per file) |
+| Intermediate files | Hidden in `work/` directory           | Visible in output directory                                                     |
