@@ -20,6 +20,3 @@ dependencies:
   - scikit-learn
   - rasterio
   - psimpy
-  - pip
-  - pip:
-      - -e ..
