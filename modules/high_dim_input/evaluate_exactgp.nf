@@ -1,5 +1,10 @@
+def exactgpEnv = params.useGPU ? 'evaluate_exactgp_cuda' : 'evaluate_exactgp'
+
 process evaluate_exactgp {
-  conda "${workflow.launchDir}/envs/${params.useGPU ? 'evaluate_exactgp_cuda.yml' : 'evaluate_exactgp.yml'}"
+  conda (params.useLockFiles
+    ? "${workflow.launchDir}/locks/${params.lockPlatform}/${exactgpEnv}.txt"
+    : "${workflow.launchDir}/envs/${exactgpEnv}.yml")
+
   tag "ExactGP"
   publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
   accelerator 1 
@@ -14,7 +19,8 @@ process evaluate_exactgp {
   """
   # macOS-specific environment variable to avoid OpenMP error
   [[ "\$(uname)" == "Darwin" ]] && export KMP_DUPLICATE_LIB_OK=TRUE
-  
+
+  export PYTHONPATH=${workflow.launchDir}/src:\${PYTHONPATH:-}  
   python ${workflow.launchDir}/scripts/high_dim_input/evaluate_exactgp.py \
     --input-dir  ${tensors} \
     --output-dir results_exactgp \
