@@ -47,7 +47,7 @@ The pipeline follows a 4-step workflow:
 
 1. Clone repository:
 ```bash
-git clone --recurse-submodules https://github.com/gary8564/nextflow_demo.git
+git clone --recurse-submodules https://github.com/gary8564/gpe_bench_nxf.git
 git submodule update --init --recursive
 ```
 
