@@ -1,5 +1,7 @@
 process preprocessing_high_dim_input {
-  conda "${workflow.launchDir}/envs/preprocessing.yml"
+  conda (params.useLockFiles
+    ? "${workflow.launchDir}/locks/${params.lockPlatform}/preprocessing.txt"
+    : "${workflow.launchDir}/envs/preprocessing.yml")
   tag "preprocessing_high_dim_input"
   input:
     path processed_data
