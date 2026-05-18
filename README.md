@@ -56,9 +56,6 @@ git submodule update --init --recursive
 nextflow run workflows/main.nf -params-file params.yaml -profile local
 ```
 
-> [!NOTE]
-> With built-in Nextflow, using `-with-dag flowchart.png` can automatically generate the DAG of the current workflow.
-
 ## Folder Structure
 
 ```
