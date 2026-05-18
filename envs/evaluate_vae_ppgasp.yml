@@ -15,5 +15,3 @@ dependencies:
   - rasterio
   - psimpy
   - pip
-  - pip:
-      - -e ..
