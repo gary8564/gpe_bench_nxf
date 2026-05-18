@@ -1,6 +1,6 @@
 # Evaluation Pipeline for Gaussian Process Emulators with High-dimensional Dataset
 
-Gaussian Processes (GPs) are suffering from the "curse of the dimensionality". As input or output dimension grows up, the computation becomes intractable. This project aims to explore the state-of-the-art research of dimensionality reduction in Gaussian Process emulation. In this repository, a workflow is constructed to facilitate benchmarking different Gaussian Process models on high-dimensional input/output problems with minimal efforts. 
+Gaussian Processes (GPs) are suffering from the "curse of the dimensionality". As input or output dimension grows up, the computation becomes intractable. This project aims to explore the state-of-the-art research of dimensionality reduction in Gaussian Process emulation. In this repository, a workflow using **Nextflow** (a orchestrated workflow management framework)  is constructed to facilitate benchmarking different Gaussian Process models on high-dimensional input/output problems with minimal efforts. 
 
 ## Workflow
 
@@ -11,75 +11,29 @@ The pipeline follows a 4-step workflow:
 1. **Data Setup**: Generate synthetic data or fetch and process real-world data using specialized modules
 2. **Preprocessing**: Standardize, split, and save data in **HDF5 format** (language-agnostic)
 3. **Model Evaluation**: Train and evaluate **GP models in parallel**:
-   - **ExactGP** (Python/GPyTorch)
-   - **DKL** (Python/GPyTorch)
-   - **RGaSP** (R/RobustGaSP)
-   - **PCA-RGaSP** (R/RobustGaSP + PCA)
+
+   **High-dimensional input models:**
+   - ExactGP (Python/GPyTorch)
+   - DKL (Python/GPyTorch)
+   - RGaSP (R/RobustGaSP)
+   - PCA-RGaSP (R/RobustGaSP + PCA)
+
+   **High-dimensional output models:**
+   - PPGaSP, PCA-PPGaSP, kPCA-PPGaSP (R/RobustGaSP)
+   - AE-PPGaSP, VAE-PPGaSP (PyTorch + R/RobustGaSP)
+   - BiGP, PCA-BiGP, MTGP (Python/GPyTorch)
    
-   Note: For larger dataset like Tsunami datasets, only **DKL** and **PCA-RGaSP** are evaluated in local devices since exact inference for **ExactGP** and **RGaSP** may face computational bottleneck.
 4. **Benchmark Metrics**: Compare model performance and save results
 
 ## Datasets
 
-### Synthetic Dataset
-
-- **Type**: Generated high-dimensional synthetic data
-- **Description**: 100D synthetic function for testing purposes
-- **Configuration**: Customizable sample size and random seed for reproducibility
-
-### Tsunami Dataset
-
-- **Type**: Real-world data from Zenodo repository
-- **Description**: Neural network-based surrogate model for tsunami inundation assessment
-- **Source**: [DOI: 10.5281/zenodo.15093228](https://zenodo.org/records/15093228)
-- **Data**: Initial water level distributions, tsunami water level distributions, and inundation distributions
-
-## Folder Structure
-Currently, there are two branches here: main and per_process_env. 
-
-In main branch: 
-```
-.
-├── nextflow.config          # Main NextFlow configuration
-├── environment.yml          # Conda environment specification
-├── requirements.txt         # Python dependencies
-├── README.md
-├── img/
-│   └── workflow.png         # Pipeline workflow diagram
-├── conf/                    # Configuration files
-│   ├── conda.config         # Conda-specific settings
-│   ├── datasets.config      # Dataset definitions and parameters
-│   └── profiles.config      # Execution profiles (local, HPC, etc.)
-├── workflows/
-│   └── main.nf              # Main workflow orchestration
-├── modules/                 # Modular NextFlow processes
-│   ├── fetch_from_zenodo.nf # Data fetching from Zenodo
-│   ├── data_setup_synthetic.nf # Synthetic data generation
-│   ├── data_setup_tsunami.nf   # Tsunami data processing
-│   ├── preprocessing.nf     # Data standardization and splitting
-│   ├── evaluate_exactgp.nf  # Exact GP model training and evaluation
-│   ├── evaluate_dkl.nf      # DKL model training and evaluation
-│   ├── evaluate_rgasp.nf    # RGaSP model training and evaluation
-|   ├── evaluate_pca_rgasp.nf  # PCA-RGaSP model training and evaluation
-│   └── benchmark_metrics.nf # Performance comparison and reporting
-├── scripts/                 # Implementation scripts
-│   ├── data_setup_synthetic.py  # Synthetic data generation
-│   ├── data_setup_tsunami.py    # Tsunami data processing
-│   ├── preprocessing.py         # Data preprocessing utilities
-│   ├── evaluate_exactgp.py      # Exact GP implementation (Python/GPyTorch)
-│   ├── evaluate_dkl.py          # DKL implementation (Python/GPyTorch)
-│   ├── evaluate_rgasp.R         # RGaSP implementation (R/RobustGaSP)
-|   ├── evaluate_pca_rgasp.nf    # PCA-RGaSP implementation (Python/PCA-RobustGaSP)
-│   └── benchmark_metrics.py     # Metrics calculation and comparison
-└── results/                     # Pipeline outputs
-```
-
-In per_process_env branch, it use conda environment locally per process unit instead of sharing global conda environment across all compute units. The folder structure is basically the same as main branch. The only difference is that there are additionall envs folder:
-```
-...
-├── envs          # conda environment yaml files for each process unit
-...
-```
+| Name                         | Source              | Problem         | Description                                                                     |
+| ---------------------------- | ----------------- | --------------- | ------------------------------------------------------------------------------- |
+| `synthetic_100d_function`    | Generated by 100D function | High-dim input  | [100D synthetic test function](https://uqworld.org/t/benchmark-case-100d-function/3732)                                                  |
+| `tsunami_tokushima`          | Zenodo            | High-dim input  | [Tsunami inundation surrogate model](https://zenodo.org/records/15093228) |
+| `environment_spill_function` | Generated by Environment spill function | High-dim output | [Environmental model function](https://www.sfu.ca/~ssurjano/environ.html)                                                    |
+| `acheron`                    | [Figshare](https://figshare.com/articles/dataset/Acheron_rock_avalanche/20449410) + [GitHub](https://github.com/yildizanil/frontiers_yildizetal/tree/main) | High-dim output | [Acheron rock avalanche](https://www.frontiersin.org/journals/earth-science/articles/10.3389/feart.2022.1032438/full)                                                         |
+| `synthetic_landslide`        | [Figshare](https://figshare.com/articles/dataset/Synthetic_case_-_Point_estimate_method/20454924) + [GitHub](https://github.com/yildizanil/frontiers_yildizetal/tree/main) | High-dim output | [Synthetic landslide simulation](https://www.frontiersin.org/journals/earth-science/articles/10.3389/feart.2022.1032438/full)                                                  |
 
 ## Prerequisites
 
@@ -89,7 +43,7 @@ In per_process_env branch, it use conda environment locally per process unit ins
 2. **NextFlow**
    - Follow the [installation instructions](https://www.nextflow.io/docs/latest/install.html)
 
-## Basic Usage
+## Quick Start
 
 1. Clone repository:
 ```bash
@@ -102,63 +56,63 @@ git submodule update --init --recursive
 nextflow run workflows/main.nf -params-file params.yaml -profile local
 ```
 
-### Synthetic dataset:
+> [!NOTE]
+> With built-in Nextflow, using `-with-dag flowchart.png` can automatically generate the DAG of the current workflow.
 
+## Folder Structure
 
-
-### Tokushima Tsunami:
-
-```bash
-nextflow run workflows/main.nf \
-  --caseStudy tsunami_tokushima \
-  --outDir results \
-  -profile local \
-  # If using micromamba
-  --useMicromamba true
+```
+.
+├── nextflow.config          # Main NextFlow configuration
+├── environment.yml          # Conda environment specification
+├── requirements.txt         # Python dependencies
+├── README.md
+├── main.nf              # Main workflow orchestration
+├── img/
+│   └── workflow.png         # Pipeline workflow diagram
+├── conf/                    # User-defined configuration files
+├── envs                     # conda environment yaml files for each process unit
+├── modules/                 # Modular NextFlow processes
+│   ├── fetch_from_zenodo.nf # Data fetching from Zenodo
+│   ├── data_setup_synthetic.nf # Synthetic data generation
+│   ├── data_setup_tsunami.nf   # Tsunami data processing
+│   ├── preprocessing.nf     # Data standardization and splitting
+│   ├── evaluate_exactgp.nf  # Exact GP model training and evaluation
+│   ├── evaluate_dkl.nf      # DKL model training and evaluation
+│   ├── evaluate_rgasp.nf    # RGaSP model training and evaluation
+|   ├── evaluate_pca_rgasp.nf  # PCA-RGaSP model training and evaluation
+│   └── benchmark_metrics.nf # Performance comparison and reporting
+├── scripts/                 # Implementation scripts corresponding to each module
+│   ├── data_setup_synthetic.py  # Synthetic data generation
+│   ├── data_setup_tsunami.py    # Tsunami data processing
+│   ├── preprocessing.py         # Data preprocessing utilities
+│   ├── evaluate_exactgp.py      # Exact GP implementation (Python/GPyTorch)
+│   ├── evaluate_dkl.py          # DKL implementation (Python/GPyTorch)
+│   ├── evaluate_rgasp.R         # RGaSP implementation (R/RobustGaSP)
+|   ├── evaluate_pca_rgasp.nf    # PCA-RGaSP implementation (Python/PCA-RobustGaSP)
+│   └── benchmark_metrics.py     # Metrics calculation and comparison
 ```
 
 ## Advanced Usage
 
-### GPU Acceleration:
+### Parameter yaml file
 
-```bash
-nextflow run workflows/main.nf \
-  --caseStudy synthetic_100d_function \
-  --outDir results \
-  --useGPU true \
-  -profile local \
-  # If using micromamba
-  --useMicromamba true
+Update the `params.yaml`: 
+```yaml
+caseStudy: xxxxx                     # name of the case study, should exist in datasets.config
+problem_type: high_dim_input         # high_dim_input | high_dim_output
+outDir: results                      # name of the output directory
+useGPU: false                        # true/false
+condaEngine: conda                   # conda/mamba/micromamba
+# The following params are used by high_dim_output workflow
+# threshold: 5e-06                     # zero-truncation threshold for outputs
+# n_components: 10                     # PCA/kPCA components
+# latent_dim: 10                       # AE/VAE latent dimension
+# Optional quantity of interest for data_setup_landslide: hmax or vmax
+# qoi: hmax
 ```
 
-### Workflow DAG generation
-
-```bash
-nextflow run workflows/main.nf \
-  --caseStudy synthetic_100d_function \
-  --outDir results \
-  -profile local \
-  -with-dag flowchart.png \
-  # If using micromamba
-  --useMicromamba true
-```
-
-### SLURM:
-
-```bash
-nextflow run workflows/main.nf \
-  --caseStudy synthetic_100d_function \
-  --outDir results \
-  --useGPU true \
-  -profile slurm \
-  # If using micromamba
-  --useMicromamba true
-```
-
-### Configuration Options
-
-1. **Dataset Configuration**
-   Extensibility for new dataset study case through the `conf/datasets.config` file
+If customed datasets are used, make sure that dataset configuration is defined in `conf/datasets.config`:
 
 ```groovy
 params {
@@ -179,24 +133,17 @@ params {
 }
 ```
 
-2. **Execution Profiles Configuration**
+### SLURM:
 
-- `local`: Run on local machine with conda environment
-- `slurm`: Run on HPC cluster with SLURM scheduler and conda environment
-- Add custom profiles in `conf/profiles.config` for other compute environments
+```bash
+nextflow run workflows/main.nf \
+  -params-file params.yaml \
+  -profile slurm
+```
 
-## Language-Agnostic Design
+## Implementation Details
 
-This workflow demonstrates **programming language agnosticism** in scientific computing pipelines:
-
-### Data Interchange Format
-
-- **HDF5**: Cross-language scientific data format
-  - Stores numerical arrays natively (no serialization overhead)
-  - Hierarchical structure for organized data (train/test splits)
-  - Metadata support for standardization parameters
-
-## Supported GP Implementations
+Benchmark all GP-variants listed below. See more details [here](https://meetingorganizer.copernicus.org/EGU26/EGU26-1288.html).
 
 | Model       | Language | Library    | Kernel     | Features                                    |
 | ----------- | -------- | ---------- | ---------- | ------------------------------------------- |
@@ -206,4 +153,14 @@ This workflow demonstrates **programming language agnosticism** in scientific co
 | **PCA-RGaSP** | R      | RobustGaSP | Matérn 5/2 | Combine RobustGaSP with PCA for scalability |
 
 
-## Benchmark Results
+## Advantage of using Nextflow:
+
+### 1. Language-Agnostic Design
+
+This workflow demonstrates **programming language agnosticism** in scientific computing pipelines by using **HDF5** as cross-language scientific data format so that the data can flow through different stages which might use different OS platform / programming languages / container images.
+
+### 2. CI-managed Reproducible Environments
+
+- **Per-process environment isolation:** Each Nextflow process can define its own Conda environment in `envs/`, allowing Python/GPyTorch, R/RobustGaSP, and other model-specific dependencies to remain isolated while still being orchestrated in one benchmark pipeline. This follows the SHOWME.how isolation principle: every computational unit should carry an explicit environment specification rather than relying on a manually configured local setup.
+
+- **Automatic `conda-lock` generation in CI:** To make the environments reproducible across local machines, CI runners, and SLURM/HPC execution, the pipeline can automatically regenerate [`conda-lock`](https://conda.github.io/conda-lock/) files whenever an `environment.yml` file changes. These lock files pin the fully resolved dependency graph for the target platform, reducing dependency drift and shifting environment maintenance from individual collaborators to a single CI workflow.
