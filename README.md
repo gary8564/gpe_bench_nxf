@@ -2,6 +2,23 @@
 
 Gaussian Processes (GPs) are suffering from the "curse of the dimensionality". As input or output dimension grows up, the computation becomes intractable. This project aims to explore the state-of-the-art research of dimensionality reduction in Gaussian Process emulation. In this repository, a workflow using **Nextflow** (a orchestrated workflow management framework)  is constructed to facilitate benchmarking different Gaussian Process models on high-dimensional input/output problems with minimal efforts. 
 
+## Table of Contents
+
+- [Workflow](#workflow)
+- [Datasets](#datasets)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Folder Structure](#folder-structure)
+- [Advanced Usage](#advanced-usage)
+  - [Parameter yaml file](#parameter-yaml-file)
+  - [SLURM](#slurm)
+- [Implementation Details](#implementation-details)
+- [Advantage of using Nextflow](#advantage-of-using-nextflow)
+  - [Language-Agnostic Design](#1-language-agnostic-design)
+  - [CI-managed Reproducible Environments](#2-ci-managed-reproducible-environments)
+- [Comparison between Nextflow and Snakemake](#comparison-between-nextflow-and-snakemake)
+- [Reference](#reference)
+
 ## Workflow
 
 ![workflow](img/workflow.png)
