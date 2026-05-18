@@ -161,9 +161,9 @@ This workflow demonstrates **programming language agnosticism** in scientific co
 
 ### 2. CI-managed Reproducible Environments
 
-- **Per-process environment isolation:** Each Nextflow process can define its own Conda environment in `envs/`, allowing Python/GPyTorch, R/RobustGaSP, and other model-specific dependencies to remain isolated while still being orchestrated in one benchmark pipeline. This follows the SHOWME.how isolation principle: every computational unit should carry an explicit environment specification rather than relying on a manually configured local setup.
+- **Per-rule/process environment isolation:** Each workflow step defines its own Conda environment in `envs/`, allowing Python/GPyTorch, R/RobustGaSP, and other model-specific dependencies to remain isolated.
 
-- **Automatic `conda-lock` generation in CI:** To make the environments reproducible across local machines, CI runners, and SLURM/HPC execution, the pipeline can automatically regenerate [`conda-lock`](https://conda.github.io/conda-lock/) files whenever an `environment.yml` file changes. These lock files pin the fully resolved dependency graph for the target platform, reducing dependency drift and shifting environment maintenance from individual collaborators to a single CI workflow.
+- **CI-generated lock/pin files:** The repository can use CI to regenerate platform-specific explicit Conda specifications whenever `envs/*.yml` changes. In Nextflow, the explicit `.txt` lock files can be referenced directly by the `conda` directive. This makes execution more reproducible.
 
 ## Comparison between Nextflow and Snakemake
 
