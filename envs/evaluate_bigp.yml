@@ -12,6 +12,4 @@ dependencies:
   - matplotlib
   - seaborn
   - rasterio
-  - pip
-  - pip:
-      - -e ..
+  
