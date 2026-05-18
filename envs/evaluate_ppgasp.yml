@@ -10,6 +10,3 @@ dependencies:
   - rpy2<3.6.0
   - rasterio
   - psimpy
-  - pip
-  - pip:
-      - -e ..
