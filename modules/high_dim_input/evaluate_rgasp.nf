@@ -1,5 +1,8 @@
 process evaluate_rgasp {
-  conda "${workflow.launchDir}/envs/evaluate_rgasp.yml"
+  conda (params.useLockFiles
+    ? "${workflow.launchDir}/locks/${params.lockPlatform}/evaluate_rgasp.txt"
+    : "${workflow.launchDir}/envs/evaluate_rgasp.yml")
+
   tag "RGaSP"
   publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
   
