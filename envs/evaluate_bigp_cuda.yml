@@ -15,6 +15,4 @@ dependencies:
   - seaborn
   - rasterio
   - psimpy
-  - pip
-  - pip:
-      - -e ..
+  
