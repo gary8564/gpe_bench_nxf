@@ -1,0 +1,51 @@
+# .github/workflows/update-conda-locks.yml
+
+name: Update Conda lock files
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "envs/*.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-locks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          auto-activate-base: true
+
+      - name: Install conda-lock
+        shell: bash -el {0}
+        run: mamba install -y conda-lock
+
+      - name: Create lock directory
+        run: mkdir -p locks/linux-64
+
+      # Add one conda-lock call per environment YAML.
+      # --kind explicit produces a file Nextflow can pass directly to
+      # the conda directive as locks/linux-64/<name>.txt.
+      - name: Generate lock files
+        shell: bash -el {0}
+        run: |
+          conda-lock -f envs/evaluate_rgasp.yml        -p linux-64 --kind explicit --filename-template "locks/{platform}/evaluate_rgasp.txt"
+          conda-lock -f envs/evaluate_exactgp.yml      -p linux-64 --kind explicit --filename-template "locks/{platform}/evaluate_exactgp.txt"
+          conda-lock -f envs/evaluate_exactgp_cuda.yml  -p linux-64 --kind explicit --filename-template "locks/{platform}/evaluate_exactgp_cuda.txt"
+          # Add more envs here as needed
+
+      - name: Commit and push updated lock files
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add locks/
+          git diff --staged --quiet || git commit -m "chore: update Nextflow conda lock files [skip ci]"
+          git push
