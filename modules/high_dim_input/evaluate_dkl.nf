@@ -1,9 +1,8 @@
-def dklEnv = params.useGPU ? 'evaluate_dkl_cuda' : 'evaluate_dkl'
-
 process evaluate_dkl {
   conda (params.useLockFiles
-    ? "${workflow.launchDir}/locks/${params.lockPlatform}/${dklEnv}.txt"
-    : "${workflow.launchDir}/envs/${dklEnv}.yml")
+    ? "${workflow.launchDir}/locks/${params.lockPlatform}/${params.useGPU ? 'evaluate_dkl_cuda' : 'evaluate_dkl'}.txt"
+    : "${workflow.launchDir}/envs/${params.useGPU ? 'evaluate_dkl_cuda' : 'evaluate_dkl'}.yml")
+
   tag "DKL"
   publishDir "${params.outDir}/${params.caseStudy}", mode: 'copy'
   accelerator 1 
