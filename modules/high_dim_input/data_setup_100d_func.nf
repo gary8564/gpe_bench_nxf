@@ -1,5 +1,8 @@
 process data_setup_100d_func {
-  conda "${workflow.launchDir}/envs/data_setup_100d_func.yml"
+  conda (params.useLockFiles
+    ? "${workflow.launchDir}/locks/${params.lockPlatform}/data_setup_100d_func.txt"
+    : "${workflow.launchDir}/envs/data_setup_100d_func.yml")
+
   tag "${caseStudy}"
   
   input:
