@@ -173,3 +173,7 @@ The same benchmark example is used in [gpe_bench_smk](https://github.com/gary856
 | Config             | `.config`                             | `.yaml`                                                                         |
 | Modules            | `modules/*.nf` (one process per file) | `rules/high_dim_input/*.smk`, `rules/high_dim_output/*.smk` (one rule per file) |
 | Intermediate files | Hidden in `work/` directory           | Visible in output directory                                                     |
+
+## Reference
+1. [Snakemake](https://snakemake.readthedocs.io/en/stable/)
+2. [Nextflow](https://www.nextflow.io/)
