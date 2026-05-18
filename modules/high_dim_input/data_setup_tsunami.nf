@@ -1,5 +1,7 @@
 process data_setup_tsunami {
-  conda "${workflow.launchDir}/envs/data_setup_tsunami.yml"
+  conda (params.useLockFiles
+    ? "${workflow.launchDir}/locks/${params.lockPlatform}/data_setup_tsunami.txt"
+    : "${workflow.launchDir}/envs/data_setup_tsunami.yml")
   tag "${caseStudy}"
   
   input:
