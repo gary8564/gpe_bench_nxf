@@ -2,7 +2,9 @@
    problem_type: high_dim_input         # high_dim_input | high_dim_output
    outDir: results                      # name of the output directory
    useGPU: false                        # true/false
-   condaEngine: conda             # conda/mamba/micromamba
+   condaEngine: conda                   # conda/mamba/micromamba
+   useLockFiles: false                  # set to true in CI via --useLockFiles true
+   lockPlatform: linux-64
    # The following params are used by high_dim_output workflow
    # threshold: 5e-06                     # zero-truncation threshold for outputs
    # n_components: 10                     # PCA/kPCA components
