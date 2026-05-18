@@ -39,8 +39,7 @@ jobs:
           nextflow run main.nf \
             -preview \
             -params-file params.yaml \
-            -profile local \
-            --ansi-log false
+            -profile local
 
   run:
     runs-on: ubuntu-latest
@@ -74,12 +73,7 @@ jobs:
         run: |
           nextflow run main.nf \
             -params-file params.yaml \
-            -profile local \
-            --caseStudy high_dim_input \
-            --useLockFiles true \
-            --lockPlatform linux-64 \
-            --useGPU false \
-            --ansi-log false
+            -profile local
 
       - name: Upload results as artifact
         if: always()
