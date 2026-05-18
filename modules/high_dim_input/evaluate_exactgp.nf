@@ -18,7 +18,6 @@ process evaluate_exactgp {
   # macOS-specific environment variable to avoid OpenMP error
   [[ "\$(uname)" == "Darwin" ]] && export KMP_DUPLICATE_LIB_OK=TRUE
 
-  export PYTHONPATH=${workflow.launchDir}/src:\${PYTHONPATH:-}  
   python ${workflow.launchDir}/scripts/high_dim_input/evaluate_exactgp.py \
     --input-dir  ${tensors} \
     --output-dir results_exactgp \
