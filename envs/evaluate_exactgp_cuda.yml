@@ -15,6 +15,3 @@ dependencies:
   - seaborn
   - scikit-learn
   - rasterio
-  - pip
-  - pip:
-      - -e ..
